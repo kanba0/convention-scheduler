@@ -44,14 +44,14 @@ curl localhost:8080/health
 ## Domain model
 
 - **Convention** — the event; has a multi-day program (start/end dates).
-- **Room** — *typed* by what it can host: `panel`, `contest`, `panel_contest`
-  (both), or `main` (the big stage). A room's type must match the attractions
-  placed in it.
+- **Room** — *typed* by what it can host: `panel`, `contest`, or `panel_contest`
+  (either). A room's type must match the attractions placed in it.
 - **Attraction** — the core unit, either a `panel` or a `contest`. Has a title,
-  duration, description, and one or more hosting panelists.
-- **Panelist** — a host; has a nick, an optional regional team, and availability
-  stored as raw free text (deliberately not over-parsed — real availability notes
-  are messy, e.g. "arrives Friday evening, only Saturday until 18:00").
+  duration, description, and one or more hosting panelists. Placed at most once.
+- **Panelist** — a host; has a nick and availability. Availability is being
+  modelled as precise time windows (converted from organizers' fuzzy notes at
+  import time), with an optional free-text note kept only as a human memo; see
+  [TODO.md](TODO.md).
 - **Slot** — a placement of an attraction into a room for a time range.
 
 ## Conflict detection (phase 2, the core feature)
