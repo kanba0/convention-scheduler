@@ -1,14 +1,14 @@
+mod conventions;
+mod error;
+mod state;
+
 use axum::{Json, Router, extract::State, routing::get};
 use serde_json::{Value, json};
+use sqlx::Row;
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{PgPool, Row};
 use std::env;
 
-/// Shared application state handed to every request handler.
-#[derive(Clone)]
-struct AppState {
-    pool: PgPool,
-}
+use crate::state::AppState;
 
 #[tokio::main]
 async fn main() {
@@ -26,8 +26,8 @@ async fn main() {
         env::var("DATABASE_URL").expect("DATABASE_URL must be set (see .env / .env.example)");
     let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
 
-    // connect_lazy means the server boots even if Postgres isn't up yet — handy in dev.
-    // The first query (e.g. /health) is what actually opens a connection.
+    // connect_lazy lets the server boot even if Postgres isn't up yet — the
+    // first query (e.g. /health) is what actually opens a connection.
     let pool = PgPoolOptions::new()
         .max_connections(5)
         // Keep /health snappy: if Postgres is unreachable, fail fast instead of
@@ -36,7 +36,7 @@ async fn main() {
         .connect_lazy(&database_url)
         .expect("failed to build Postgres connection pool");
 
-    // Try to run migrations, but don't crash the server if the DB isn't reachable yet.
+    // Run migrations, but don't crash the server if the DB isn't reachable yet.
     match sqlx::migrate!("./migrations").run(&pool).await {
         Ok(()) => tracing::info!("migrations applied"),
         Err(e) => tracing::warn!("could not run migrations (is Postgres up?): {e}"),
@@ -46,6 +46,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/health", get(health))
+        .merge(conventions::router())
         .with_state(state)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 
@@ -59,7 +60,7 @@ async fn main() {
 }
 
 /// Liveness + DB connectivity probe. Always returns 200 so the process reports
-/// "alive"; the body tells you whether Postgres is actually reachable.
+/// "alive"; the body reports whether Postgres is actually reachable.
 async fn health(State(state): State<AppState>) -> Json<Value> {
     let db_up = sqlx::query("SELECT 1")
         .fetch_one(&state.pool)
