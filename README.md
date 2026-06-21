@@ -20,7 +20,7 @@ Early development. Phase 0 (scaffold) is complete; the CRUD spine is next. See t
 - **PostgreSQL** 17 via **sqlx** 0.8 (compile-time-checked queries, migrations)
 - **tokio** async runtime, **serde** for JSON, **tracing** for structured logs
 - **Docker Compose** for the local database
-- Integration tests + GitHub Actions CI (planned, phase 3)
+- Integration tests + GitHub Actions CI (planned, phase 4)
 
 ## Getting started
 
@@ -70,7 +70,7 @@ git config core.hooksPath .githooks
   [TODO.md](TODO.md).
 - **Slot** — a placement of an attraction into a room for a time range.
 
-## Conflict detection (phase 2, the core feature)
+## Conflict detection (phase 3, the core feature)
 
 Organizers currently color grid cells by hand to mark clashes. The API will
 automate the three real checks:
@@ -85,10 +85,10 @@ automate the three real checks:
   Postgres, migrations wired up.
 - [ ] **Phase 1** — CRUD spine: conventions, rooms, panelists, attractions,
   slot assignment, and an assembled `GET /schedule` view.
-- [ ] **Phase 1.5** — CSV / spreadsheet import for the attraction list.
-- [ ] **Phase 2** — conflict detection (`GET /conventions/:id/conflicts`),
+- [ ] **Phase 2** — CSV / spreadsheet import for the attraction list.
+- [ ] **Phase 3** — conflict detection (`GET /conventions/:id/conflicts`),
   with a database-level `EXCLUDE` constraint preventing room overlaps.
-- [ ] **Phase 3** — integration tests, Dockerfile, GitHub Actions CI
+- [ ] **Phase 4** — integration tests, Dockerfile, GitHub Actions CI
   (`cargo test` + `cargo clippy -D warnings`).
 - [ ] **Later** — a thin web UI so non-technical organizers can use it without
   touching the API directly.
