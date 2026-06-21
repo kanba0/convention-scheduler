@@ -1,6 +1,7 @@
 mod attractions;
 mod conventions;
 mod error;
+mod host_links;
 mod panelists;
 mod rooms;
 mod state;
@@ -53,6 +54,7 @@ async fn main() {
         .merge(rooms::router())
         .merge(panelists::router())
         .merge(attractions::router())
+        .merge(host_links::router())
         .with_state(state)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 

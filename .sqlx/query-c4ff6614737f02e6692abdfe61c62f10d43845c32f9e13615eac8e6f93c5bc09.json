@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO attraction_panelists (attraction_id, panelist_id)\n        SELECT a.id, p.id\n        FROM attractions a, panelists p\n        WHERE a.id = $1 AND p.id = $2 AND a.convention_id = p.convention_id\n        ON CONFLICT DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c4ff6614737f02e6692abdfe61c62f10d43845c32f9e13615eac8e6f93c5bc09"
+}

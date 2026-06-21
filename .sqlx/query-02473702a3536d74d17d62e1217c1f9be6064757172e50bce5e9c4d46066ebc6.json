@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT p.id, p.convention_id, p.nick, p.availability_note, p.created_at, p.updated_at\n        FROM panelists p\n        JOIN attraction_panelists ap ON ap.panelist_id = p.id\n        WHERE ap.attraction_id = $1\n        ORDER BY p.nick\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "convention_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "nick",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "availability_note",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "02473702a3536d74d17d62e1217c1f9be6064757172e50bce5e9c4d46066ebc6"
+}

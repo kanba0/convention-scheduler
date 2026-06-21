@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM attraction_panelists WHERE attraction_id = $1 AND panelist_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bdd809f18a3a27c713ef965c498433c45b8e7dd9c7437094139c4d275fa2a62e"
+}

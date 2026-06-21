@@ -15,15 +15,15 @@ use crate::state::AppState;
 /// A full panelist row, as returned to clients.
 #[derive(Serialize)]
 pub struct Panelist {
-    id: Uuid,
-    convention_id: Uuid,
-    nick: String,
+    pub(crate) id: Uuid,
+    pub(crate) convention_id: Uuid,
+    pub(crate) nick: String,
     // Nullable: a human memo only. Structured availability is a separate table later (see TODO.md).
-    availability_note: Option<String>,
+    pub(crate) availability_note: Option<String>,
     #[serde(with = "time::serde::rfc3339")]
-    created_at: OffsetDateTime,
+    pub(crate) created_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]
-    updated_at: OffsetDateTime,
+    pub(crate) updated_at: OffsetDateTime,
 }
 
 /// Accepted on POST. The convention comes from the path, not the body.
