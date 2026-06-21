@@ -1,0 +1,3 @@
+# Default to the committed .sqlx/ cache so builds, rust-analyzer, and CI need no DB.
+[env]
+SQLX_OFFLINE = "true"

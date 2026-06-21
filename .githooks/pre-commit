@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Block a commit whose SQL drifted from the committed .sqlx/ cache.
+# Needs the dev Postgres + sqlx-cli; skips with a warning if either is absent.
+set -euo pipefail
+
+# Only relevant when Rust sources or the cache itself are staged.
+git diff --cached --name-only | grep -qE '\.rs$|^\.sqlx/' || exit 0
+
+command -v cargo-sqlx >/dev/null 2>&1 || {
+    echo "pre-commit: sqlx-cli not installed — skipping .sqlx check." >&2
+    exit 0
+}
+
+DATABASE_URL="postgres://convention:convention@localhost:5432/convention_scheduler"
+if ! (exec 3<>/dev/tcp/localhost/5432) 2>/dev/null; then
+    echo "pre-commit: Postgres unreachable — skipping .sqlx check (run 'docker compose up -d')." >&2
+    exit 0
+fi
+
+echo "pre-commit: checking .sqlx cache is current…"
+# SQLX_OFFLINE=false overrides .cargo/config.toml so this verifies against the live DB.
+if ! DATABASE_URL="$DATABASE_URL" SQLX_OFFLINE=false cargo sqlx prepare --check >/dev/null 2>&1; then
+    echo "✗ .sqlx cache is stale. Run:  cargo sqlx prepare  then  git add .sqlx" >&2
+    exit 1
+fi
+echo "✓ .sqlx cache current"

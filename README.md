@@ -41,6 +41,22 @@ curl localhost:8080/health
 # -> {"db":"up","status":"ok"}
 ```
 
+### Development
+
+Queries are checked at compile time against the committed `.sqlx/` cache, so builds
+need no database (`.cargo/config.toml` sets `SQLX_OFFLINE`). After changing any query,
+refresh the cache:
+
+```sh
+cargo sqlx prepare   # needs the dev Postgres up; commit the updated .sqlx/
+```
+
+Enable the pre-commit hook once per clone to catch a stale cache before it lands:
+
+```sh
+git config core.hooksPath .githooks
+```
+
 ## Domain model
 
 - **Convention** — the event; has a multi-day program (start/end dates).
