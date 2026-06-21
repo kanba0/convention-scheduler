@@ -1,5 +1,6 @@
 mod conventions;
 mod error;
+mod rooms;
 mod state;
 
 use axum::{Json, Router, extract::State, routing::get};
@@ -47,6 +48,7 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(health))
         .merge(conventions::router())
+        .merge(rooms::router())
         .with_state(state)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 

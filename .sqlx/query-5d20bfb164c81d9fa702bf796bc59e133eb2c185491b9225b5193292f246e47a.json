@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE rooms\n        SET name = COALESCE($2, name),\n            kind = COALESCE($3::room_kind, kind)\n        WHERE id = $1\n        RETURNING id, convention_id, name, kind AS \"kind: RoomKind\", created_at, updated_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "convention_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "kind: RoomKind",
+        "type_info": {
+          "Custom": {
+            "name": "room_kind",
+            "kind": {
+              "Enum": [
+                "panel",
+                "contest",
+                "panel_contest"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        {
+          "Custom": {
+            "name": "room_kind",
+            "kind": {
+              "Enum": [
+                "panel",
+                "contest",
+                "panel_contest"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5d20bfb164c81d9fa702bf796bc59e133eb2c185491b9225b5193292f246e47a"
+}

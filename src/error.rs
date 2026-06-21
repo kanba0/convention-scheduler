@@ -38,6 +38,9 @@ impl From<sqlx::Error> for AppError {
             if db.is_check_violation() {
                 return AppError::Validation(db.constraint().unwrap_or("check").to_string());
             }
+            if db.is_foreign_key_violation() {
+                return AppError::Validation(db.constraint().unwrap_or("foreign key").to_string());
+            }
         }
         AppError::Database(err)
     }
