@@ -9,6 +9,11 @@ typed rooms, panels vs. contests, multiple hosts per attraction, fuzzy free-text
 panelist availability, and the colored grid cells that encode "this slot fits / this
 slot clashes" — which is exactly the conflict detection this API automates.
 
+This repo is full-stack — a Rust backend plus an in-repo frontend (not Rust) added
+later. The core product is the operator's workflow: **auto-generate** a schedule from
+the constraints, then **hand-adjust** it by dragging attractions around a room×time
+grid with live conflict highlighting.
+
 ## Status
 
 Early development. Phase 0 (scaffold) is complete; the CRUD spine is next. See the
@@ -84,14 +89,18 @@ automate the three real checks:
 - [x] **Phase 0** — scaffold: axum server, `/health` DB probe, Docker Compose
   Postgres, migrations wired up.
 - [ ] **Phase 1** — CRUD spine: conventions, rooms, panelists, attractions,
-  slot assignment, and an assembled `GET /schedule` view.
+  host links, slots, and an assembled `GET /schedule` view.
 - [ ] **Phase 2** — CSV / spreadsheet import for the attraction list.
 - [ ] **Phase 3** — conflict detection (`GET /conventions/:id/conflicts`),
   with a database-level `EXCLUDE` constraint preventing room overlaps.
-- [ ] **Phase 4** — integration tests, Dockerfile, GitHub Actions CI
+- [ ] **Phase 4** — hardening: integration tests, Dockerfile, GitHub Actions CI
   (`cargo test` + `cargo clippy -D warnings`).
-- [ ] **Later** — a thin web UI so non-technical organizers can use it without
-  touching the API directly.
+- [ ] **Phase 5** — schedule generator: auto-place attractions into slots from the
+  constraints (hard rules: room type, availability, no double-booking; soft prefs
+  as bias).
+- [ ] **Phase 6** — operator GUI (in-repo, non-Rust frontend): view the schedule
+  grid, drag attractions between room×time cells, live conflict colours — the core
+  product surface. Intertwined with Phase 5 (a viewer is how you test the generator).
 
 ## License
 
