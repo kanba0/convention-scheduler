@@ -101,14 +101,13 @@ CREATE TABLE attractions (
     convention_id    uuid            NOT NULL REFERENCES conventions (id) ON DELETE CASCADE,
     title            text            NOT NULL,
     kind             attraction_kind NOT NULL,
-    -- NULL = duration not estimated yet; any actual value must be positive.
-    duration_minutes integer,
+    -- Required; must be positive (enforced by the CHECK below).
+    duration_minutes integer         NOT NULL,
     description      text,
     created_at       timestamptz     NOT NULL DEFAULT now(),
     updated_at       timestamptz     NOT NULL DEFAULT now(),
 
-    CONSTRAINT attractions_duration_positive
-        CHECK (duration_minutes IS NULL OR duration_minutes > 0)
+    CONSTRAINT attractions_duration_positive CHECK (duration_minutes > 0)
 );
 
 CREATE TRIGGER attractions_set_updated_at

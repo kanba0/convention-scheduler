@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE attractions\n        SET title            = COALESCE($2, title),\n            kind             = COALESCE($3::attraction_kind, kind),\n            duration_minutes = COALESCE($4, duration_minutes),\n            description      = COALESCE($5, description)\n        WHERE id = $1\n        RETURNING id, convention_id, title, kind AS \"kind: AttractionKind\",\n                  duration_minutes, description, created_at, updated_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "convention_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "kind: AttractionKind",
+        "type_info": {
+          "Custom": {
+            "name": "attraction_kind",
+            "kind": {
+              "Enum": [
+                "panel",
+                "contest"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "duration_minutes",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        {
+          "Custom": {
+            "name": "attraction_kind",
+            "kind": {
+              "Enum": [
+                "panel",
+                "contest"
+              ]
+            }
+          }
+        },
+        "Int4",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "e0e8ff47ee54985c2686b4e3381af3f96a8a26fad4d492df044013edf3d4b5a0"
+}
