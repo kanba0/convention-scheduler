@@ -16,7 +16,9 @@ grid with live conflict highlighting.
 
 ## Status
 
-Early development. Phase 0 (scaffold) is complete; the CRUD spine is next. See the
+Early development. The Phase 1 CRUD spine is complete — conventions, rooms,
+panelists, attractions, host links, slots, and the assembled `GET /schedule` view.
+Import (Phase 2) and conflict detection (Phase 3) are next. See the
 [Roadmap](#roadmap) below.
 
 ## Tech stack
@@ -88,7 +90,7 @@ automate the three real checks:
 
 - [x] **Phase 0** — scaffold: axum server, `/health` DB probe, Docker Compose
   Postgres, migrations wired up.
-- [ ] **Phase 1** — CRUD spine: conventions, rooms, panelists, attractions,
+- [x] **Phase 1** — CRUD spine: conventions, rooms, panelists, attractions,
   host links, slots, and an assembled `GET /schedule` view.
 - [ ] **Phase 2** — CSV / spreadsheet import for the attraction list.
 - [ ] **Phase 3** — conflict detection (`GET /conventions/:id/conflicts`),

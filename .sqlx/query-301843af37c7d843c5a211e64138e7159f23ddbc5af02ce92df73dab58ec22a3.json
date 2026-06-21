@@ -1,0 +1,97 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT s.id AS slot_id, s.starts_at, s.ends_at,\n               r.id AS \"room_id!\", r.name AS \"room_name!\", r.kind AS \"room_kind!: RoomKind\",\n               a.id AS \"attraction_id!\", a.title AS \"attraction_title!\",\n               a.kind AS \"attraction_kind!: AttractionKind\", a.duration_minutes AS \"duration_minutes!\"\n        FROM slots s\n        JOIN rooms r ON r.id = s.room_id\n        JOIN attractions a ON a.id = s.attraction_id\n        WHERE a.convention_id = $1\n        ORDER BY s.starts_at, r.name\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "slot_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "starts_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "ends_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "room_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "room_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "room_kind!: RoomKind",
+        "type_info": {
+          "Custom": {
+            "name": "room_kind",
+            "kind": {
+              "Enum": [
+                "panel",
+                "contest",
+                "panel_contest"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "attraction_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "attraction_title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "attraction_kind!: AttractionKind",
+        "type_info": {
+          "Custom": {
+            "name": "attraction_kind",
+            "kind": {
+              "Enum": [
+                "panel",
+                "contest"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "duration_minutes!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "301843af37c7d843c5a211e64138e7159f23ddbc5af02ce92df73dab58ec22a3"
+}

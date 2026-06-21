@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT ap.attraction_id, p.id AS \"panelist_id!\", p.nick AS \"nick!\"\n        FROM attraction_panelists ap\n        JOIN panelists p ON p.id = ap.panelist_id\n        JOIN attractions a ON a.id = ap.attraction_id\n        WHERE a.convention_id = $1\n        ORDER BY p.nick\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "attraction_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "panelist_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "nick!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c402bd6a60872378856bf01b30fcee5b6bb27de5d5cfcfc8b74375a36784460d"
+}
