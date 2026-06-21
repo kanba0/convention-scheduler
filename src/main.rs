@@ -1,5 +1,6 @@
 mod conventions;
 mod error;
+mod panelists;
 mod rooms;
 mod state;
 
@@ -49,6 +50,7 @@ async fn main() {
         .route("/health", get(health))
         .merge(conventions::router())
         .merge(rooms::router())
+        .merge(panelists::router())
         .with_state(state)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 
