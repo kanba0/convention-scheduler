@@ -16,10 +16,10 @@ grid with live conflict highlighting.
 
 ## Status
 
-Early development. The Phase 1 CRUD spine is complete — conventions, rooms,
-panelists, attractions, host links, slots, and the assembled `GET /schedule` view.
-Import (Phase 2) and conflict detection (Phase 3) are next. See the
-[Roadmap](#roadmap) below.
+Early development. The Phase 1 CRUD spine and Phase 2 CSV import are complete —
+conventions, rooms, panelists, attractions, host links, slots, the assembled
+`GET /schedule` view, and bulk attraction import. Conflict detection (Phase 3)
+is next. See the [Roadmap](#roadmap) below.
 
 ## Tech stack
 
@@ -92,7 +92,7 @@ automate the three real checks:
   Postgres, migrations wired up.
 - [x] **Phase 1** — CRUD spine: conventions, rooms, panelists, attractions,
   host links, slots, and an assembled `GET /schedule` view.
-- [ ] **Phase 2** — CSV / spreadsheet import for the attraction list.
+- [x] **Phase 2** — CSV / spreadsheet import for the attraction list.
 - [ ] **Phase 3** — conflict detection (`GET /conventions/:id/conflicts`),
   with a database-level `EXCLUDE` constraint preventing room overlaps.
 - [ ] **Phase 4** — hardening: integration tests, Dockerfile, GitHub Actions CI

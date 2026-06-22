@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO attractions (convention_id, title, kind, duration_minutes, description)\n            VALUES ($1, $2, $3::attraction_kind, $4, $5)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        {
+          "Custom": {
+            "name": "attraction_kind",
+            "kind": {
+              "Enum": [
+                "panel",
+                "contest"
+              ]
+            }
+          }
+        },
+        "Int4",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d244b7f40350cae1fc59358a0033a27d3a9873424b3945a5454ba169eb01e8d1"
+}

@@ -60,10 +60,41 @@ version can prove itself first. Nothing here is committed to a phase yet.
   twice, model it as a distinct "repeatable" event concept rather than relaxing
   the constraint.
 
-## Frontend (out of scope for this repo)
+## Import
 
-- [ ] A GUI for editing the schedule (drag time-blocks, snap to 30-min grid,
-  colour conflicts). This would be a **separate frontend app** (TS/JS) talking
-  to this API — not Rust. The block-editing UX is why fixed time-blocks may beat
-  free ranges at the presentation layer, even though the DB stores flexible
-  `starts_at`/`ends_at`.
+CSV stays the interchange format — universal, and conventions on oddball tools
+can still export or convert to it. No multi-format (xlsx, …) parsing server-side;
+the CSV boundary is the API's contract. Phase 2 built the basic importer; these
+are the operator-facing extensions for when the GUI lands.
+
+- [ ] **Preview-then-confirm (dry-run).** A validate-only pass reports what
+  *would* happen ("23 attractions, 4 new panelists: Alice, Bob, …; 2 rows have
+  errors") with nothing written, then a confirm commits it. The Phase 2 importer
+  already separates validation from the write, so the preview summary is
+  computable without touching the DB — design the endpoint for it (a dry-run
+  flag, or a preview call paired with a commit call).
+- [ ] **Operator selects what to import.** Sheets are not a fixed shape — extra
+  notes columns, section headers, differing orders. The UI lets the operator map
+  / pick which columns feed which fields, rather than forcing a rigid header row.
+  More than a 1:1 column rename.
+- [ ] **Error preview grid.** Render the sheet as a table, paint the bad rows /
+  cells red with the message on hover. The Phase 2 `{"errors":[...]}` response
+  already carries `line N` + `column 'x'` — exactly what this needs.
+- [ ] **Re-import / replace semantics.** Attractions have no title uniqueness, so
+  a naive re-import duplicates them. Options to design: warn which titles would
+  double; a "replace" mode; a "wipe the schedule and re-import" reset. Today's
+  importer is append-only (documented limitation).
+- [ ] **Separate panelist-availability importer (later).** Hourly availability
+  constraints likely need their own import path, distinct from the attraction
+  list, feeding the structured windows under *Panelists & availability* above.
+  Defer until that need actually lands — don't build it ahead of the table.
+
+## Frontend / GUI
+
+The operator GUI is a committed phase, not out of scope: see
+[Phase 6](README.md#roadmap) — in-repo, non-Rust (TS/JS), talking to this API.
+The deferred design questions are about its UX, not whether to build it:
+
+- [ ] **Block-editing UX.** Drag time-blocks, snap to a 30-min grid, colour
+  conflicts live. This is why fixed time-blocks may beat free ranges at the
+  presentation layer, even though the DB stores flexible `starts_at`/`ends_at`.

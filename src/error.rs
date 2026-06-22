@@ -17,6 +17,11 @@ pub enum AppError {
     #[error("validation failed: {0}")]
     Validation(String),
 
+    /// A bulk import failed; each entry is one bad row. Reported together so the
+    /// whole sheet can be fixed in one pass. -> 422 with the full list.
+    #[error("validation failed: {0:?}")]
+    ValidationList(Vec<String>),
+
     /// A uniqueness rule was violated. -> 409
     #[error("conflict: {0}")]
     Conflict(String),
@@ -48,19 +53,25 @@ impl From<sqlx::Error> for AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let (status, message) = match self {
-            AppError::NotFound => (StatusCode::NOT_FOUND, "not found".to_string()),
-            AppError::Validation(what) => (StatusCode::UNPROCESSABLE_ENTITY, what),
-            AppError::Conflict(what) => (StatusCode::CONFLICT, what),
+        let (status, body) = match self {
+            AppError::NotFound => (StatusCode::NOT_FOUND, json!({ "error": "not found" })),
+            AppError::Validation(what) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, json!({ "error": what }))
+            }
+            // A bulk import reports every bad row at once, so the body is a list.
+            AppError::ValidationList(errors) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, json!({ "errors": errors }))
+            }
+            AppError::Conflict(what) => (StatusCode::CONFLICT, json!({ "error": what })),
             AppError::Database(err) => {
                 tracing::error!("database error: {err}");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "internal server error".to_string(),
+                    json!({ "error": "internal server error" }),
                 )
             }
         };
 
-        (status, Json(json!({ "error": message }))).into_response()
+        (status, Json(body)).into_response()
     }
 }

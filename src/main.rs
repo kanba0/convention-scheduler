@@ -2,6 +2,7 @@ mod attractions;
 mod conventions;
 mod error;
 mod host_links;
+mod import;
 mod panelists;
 mod rooms;
 mod schedule;
@@ -56,6 +57,7 @@ async fn main() {
         .merge(rooms::router())
         .merge(panelists::router())
         .merge(attractions::router())
+        .merge(import::router())
         .merge(host_links::router())
         .merge(slots::router())
         .merge(schedule::router())
