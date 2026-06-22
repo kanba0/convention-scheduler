@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT p.id AS \"panelist_id!\", p.nick AS \"panelist_nick!\",\n               s1.id AS \"slot1_id!\", a1.title AS \"a1_title!\",\n               s1.starts_at AS \"s1_start!\", s1.ends_at AS \"s1_end!\",\n               s2.id AS \"slot2_id!\", a2.title AS \"a2_title!\",\n               s2.starts_at AS \"s2_start!\", s2.ends_at AS \"s2_end!\"\n        FROM slots s1\n        JOIN slots s2 ON s2.id > s1.id\n        JOIN attraction_panelists ap1 ON ap1.attraction_id = s1.attraction_id\n        JOIN attraction_panelists ap2 ON ap2.attraction_id = s2.attraction_id\n                                     AND ap2.panelist_id = ap1.panelist_id\n        JOIN panelists p ON p.id = ap1.panelist_id\n        JOIN attractions a1 ON a1.id = s1.attraction_id\n        JOIN attractions a2 ON a2.id = s2.attraction_id\n        WHERE a1.convention_id = $1\n          AND tstzrange(s1.starts_at, s1.ends_at) && tstzrange(s2.starts_at, s2.ends_at)\n        ORDER BY p.nick\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "panelist_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "panelist_nick!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "slot1_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "a1_title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "s1_start!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "s1_end!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "slot2_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "a2_title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "s2_start!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "s2_end!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "edebbd79231c5172b26094e3907601371984d9c2b7782429dd22b6d0f1066506"
+}

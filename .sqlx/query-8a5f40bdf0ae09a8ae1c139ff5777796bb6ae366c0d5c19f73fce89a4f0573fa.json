@@ -1,0 +1,93 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT r.id AS \"room_id!\", r.name AS \"room_name!\", r.kind AS \"room_kind!: RoomKind\",\n               s1.id AS \"slot1_id!\", a1.title AS \"a1_title!\",\n               s1.starts_at AS \"s1_start!\", s1.ends_at AS \"s1_end!\",\n               s2.id AS \"slot2_id!\", a2.title AS \"a2_title!\",\n               s2.starts_at AS \"s2_start!\", s2.ends_at AS \"s2_end!\"\n        FROM slots s1\n        JOIN slots s2 ON s2.room_id = s1.room_id AND s2.id > s1.id\n        JOIN attractions a1 ON a1.id = s1.attraction_id\n        JOIN attractions a2 ON a2.id = s2.attraction_id\n        JOIN rooms r ON r.id = s1.room_id\n        WHERE a1.convention_id = $1\n          AND tstzrange(s1.starts_at, s1.ends_at) && tstzrange(s2.starts_at, s2.ends_at)\n        ORDER BY s1.starts_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "room_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "room_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "room_kind!: RoomKind",
+        "type_info": {
+          "Custom": {
+            "name": "room_kind",
+            "kind": {
+              "Enum": [
+                "panel",
+                "contest",
+                "panel_contest"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "slot1_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "a1_title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "s1_start!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "s1_end!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "slot2_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "a2_title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "s2_start!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "s2_end!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8a5f40bdf0ae09a8ae1c139ff5777796bb6ae366c0d5c19f73fce89a4f0573fa"
+}

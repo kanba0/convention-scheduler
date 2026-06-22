@@ -4,6 +4,18 @@ Phase-sequenced work lives in the [README roadmap](README.md#roadmap). This file
 is the *design backlog*: bigger ideas we deliberately deferred so the basic
 version can prove itself first. Nothing here is committed to a phase yet.
 
+## Conflicts — the no-EXCLUDE decision (phase 3)
+
+Phase 3 *reports* clashes (room double-book, panelist double-book, room-type
+mismatch) rather than preventing them. The manual workflow tolerates-and-highlights,
+and the planned editor enforces one-attraction-per-cell through its drag interaction:
+dropping a panel onto an occupied cell **swaps** the two or **unbinds** the occupant,
+so an overlap is never a state the UI can leave you in. That makes a database
+`EXCLUDE` constraint on room overlaps redundant — and costly: a swap would have to
+delete-then-insert inside one transaction (or use a `DEFERRABLE` constraint) to avoid
+tripping the constraint mid-move. Revisit only if some future path genuinely needs
+hard write-time prevention rather than report-and-resolve.
+
 ## Scheduling intelligence
 
 - [ ] **Constraint system for placement.** The heart of a real scheduler:
@@ -27,6 +39,18 @@ version can prove itself first. Nothing here is committed to a phase yet.
 - [ ] **Room class beyond kind** — for example, "main stage". A stage hosts its own category of things
   (cosplay contest, concert, big-guest meetup) and seats far more people. Needs
   its own modelling, not an enum value.
+- [ ] **Explicit room↔attraction compatibility map.** The phase-3 room-type check
+  (`r.kind::text <> a.kind::text`, with `panel_contest` hardcoded as the permissive
+  case) only holds while the two enums share labels and there's exactly one "allows
+  anything" room. More room/attraction kinds turn "allows" into a real many-to-many,
+  so list what each room kind permits explicitly — a mapping table or declared matrix
+  the conflict check (and later the scheduler's hard constraints) reads from, instead
+  of a string compare with a baked-in exception.
+- [ ] **Operator-defined types.** Going further: let the organizer define their own
+  room and attraction types (every con has its own vocabulary), which means the kinds
+  stop being fixed Postgres `ENUM`s and become *data* — reference tables of types, with
+  the compatibility map above user-editable too. A larger shift (enum → table, plus
+  validation/migration of existing rows); pairs with the mapping work above.
 
 ## Panelists & availability
 

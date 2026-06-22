@@ -1,0 +1,79 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT s.id AS \"slot_id!\", a.title AS \"attraction_title!\",\n               s.starts_at AS \"starts_at!\", s.ends_at AS \"ends_at!\",\n               a.kind AS \"attraction_kind!: AttractionKind\",\n               r.name AS \"room_name!\", r.kind AS \"room_kind!: RoomKind\"\n        FROM slots s\n        JOIN attractions a ON a.id = s.attraction_id\n        JOIN rooms r ON r.id = s.room_id\n        WHERE a.convention_id = $1\n          AND r.kind <> 'panel_contest'\n          AND r.kind::text <> a.kind::text\n        ORDER BY s.starts_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "slot_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "attraction_title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "starts_at!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "ends_at!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "attraction_kind!: AttractionKind",
+        "type_info": {
+          "Custom": {
+            "name": "attraction_kind",
+            "kind": {
+              "Enum": [
+                "panel",
+                "contest"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "room_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "room_kind!: RoomKind",
+        "type_info": {
+          "Custom": {
+            "name": "room_kind",
+            "kind": {
+              "Enum": [
+                "panel",
+                "contest",
+                "panel_contest"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8efd18068ae403ec9bb8ce0438deb0f32b553c1f9145cc2b8c9184a2cb5a4ae0"
+}

@@ -16,10 +16,10 @@ grid with live conflict highlighting.
 
 ## Status
 
-Early development. The Phase 1 CRUD spine and Phase 2 CSV import are complete —
-conventions, rooms, panelists, attractions, host links, slots, the assembled
-`GET /schedule` view, and bulk attraction import. Conflict detection (Phase 3)
-is next. See the [Roadmap](#roadmap) below.
+Early development. Phases 1–3 are complete — the CRUD spine (conventions, rooms,
+panelists, attractions, host links, slots), the assembled `GET /schedule` view,
+bulk attraction import, and `GET /conventions/:id/conflicts` conflict detection.
+Hardening (Phase 4) is next. See the [Roadmap](#roadmap) below.
 
 ## Tech stack
 
@@ -79,12 +79,18 @@ git config core.hooksPath .githooks
 
 ## Conflict detection (phase 3, the core feature)
 
-Organizers currently color grid cells by hand to mark clashes. The API will
-automate the three real checks:
+Organizers currently color grid cells by hand to mark clashes. The API automates
+the three real checks:
 
 1. A room double-booked (two overlapping slots in the same room).
 2. A panelist double-booked (hosting two overlapping attractions).
 3. An attraction placed in a room whose type doesn't match its kind.
+
+`GET /conventions/:id/conflicts` *reports* these — it does not forbid them. A clash
+is a state you can sit in and then resolve, mirroring the manual grid. An earlier
+plan to add a database `EXCLUDE` constraint preventing room overlaps was dropped (see
+[TODO.md](TODO.md)): the editor already enforces one attraction per cell through its
+drag/swap interaction, so the constraint would be redundant and only make edits harder.
 
 ## Roadmap
 
@@ -93,8 +99,9 @@ automate the three real checks:
 - [x] **Phase 1** — CRUD spine: conventions, rooms, panelists, attractions,
   host links, slots, and an assembled `GET /schedule` view.
 - [x] **Phase 2** — CSV / spreadsheet import for the attraction list.
-- [ ] **Phase 3** — conflict detection (`GET /conventions/:id/conflicts`),
-  with a database-level `EXCLUDE` constraint preventing room overlaps.
+- [x] **Phase 3** — conflict detection (`GET /conventions/:id/conflicts`): room
+  double-booking, panelist double-booking, and room-type mismatch, reported (not
+  forbidden — the editor's drag/swap handles room occupancy; see TODO.md).
 - [ ] **Phase 4** — hardening: integration tests, Dockerfile, GitHub Actions CI
   (`cargo test` + `cargo clippy -D warnings`).
 - [ ] **Phase 5** — schedule generator: auto-place attractions into slots from the
