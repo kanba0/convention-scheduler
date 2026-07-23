@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # A throwaway Postgres for the integration tests. `#[sqlx::test]` creates its
+    # own per-test databases on this server, so the user must be a superuser
+    # (the postgres image makes POSTGRES_USER one).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: convention
+          POSTGRES_PASSWORD: convention
+          POSTGRES_DB: convention_scheduler
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U convention -d convention_scheduler"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Compilation is offline (the committed .sqlx cache, via .cargo/config.toml);
+      # this is only used by the tests at runtime.
+      DATABASE_URL: postgres://convention:convention@localhost:5432/convention_scheduler
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test
