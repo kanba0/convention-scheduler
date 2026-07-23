@@ -116,8 +116,18 @@ async fn conflicts(
             room_name: row.room_name,
             room_kind: row.room_kind,
             slots: [
-                SlotRef { id: row.slot1_id, attraction_title: row.a1_title, starts_at: row.s1_start, ends_at: row.s1_end },
-                SlotRef { id: row.slot2_id, attraction_title: row.a2_title, starts_at: row.s2_start, ends_at: row.s2_end },
+                SlotRef {
+                    id: row.slot1_id,
+                    attraction_title: row.a1_title,
+                    starts_at: row.s1_start,
+                    ends_at: row.s1_end,
+                },
+                SlotRef {
+                    id: row.slot2_id,
+                    attraction_title: row.a2_title,
+                    starts_at: row.s2_start,
+                    ends_at: row.s2_end,
+                },
             ],
         });
     }
@@ -153,8 +163,18 @@ async fn conflicts(
             panelist_id: row.panelist_id,
             panelist_nick: row.panelist_nick,
             slots: [
-                SlotRef { id: row.slot1_id, attraction_title: row.a1_title, starts_at: row.s1_start, ends_at: row.s1_end },
-                SlotRef { id: row.slot2_id, attraction_title: row.a2_title, starts_at: row.s2_start, ends_at: row.s2_end },
+                SlotRef {
+                    id: row.slot1_id,
+                    attraction_title: row.a1_title,
+                    starts_at: row.s1_start,
+                    ends_at: row.s1_end,
+                },
+                SlotRef {
+                    id: row.slot2_id,
+                    attraction_title: row.a2_title,
+                    starts_at: row.s2_start,
+                    ends_at: row.s2_end,
+                },
             ],
         });
     }

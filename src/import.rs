@@ -1,14 +1,9 @@
-//! `POST /conventions/{id}/import` — bulk-load a convention's attraction list from a
-//! CSV (the organizer's spreadsheet, exported).
+//! `POST /conventions/{id}/import` — bulk-load a convention's attraction list from an
+//! exported CSV.
 //!
-//! Two phases. **Validate** parses and checks every row with no database access,
-//! collecting *all* problems so the operator can fix the whole sheet in one pass; any
-//! error means nothing is imported. **Write** runs only on clean rows, in a single
-//! transaction that's all-or-nothing as a backstop.
-//!
-//! Expected columns: `title`, `kind`, `duration_hours`, `hosts`, `description`. `kind`
-//! blank defaults to `panel`; `hosts` is a comma-separated nick list inside one cell;
-//! durations are hours in the sheet, converted to the minutes the DB stores.
+//! Two phases. **Validate** checks every row with no database access, collecting *all*
+//! problems so the operator can fix the whole sheet in one pass. **Write** runs only on
+//! clean rows, in a single all-or-nothing transaction.
 
 use std::collections::HashMap;
 
@@ -27,7 +22,7 @@ use crate::state::AppState;
 #[derive(Deserialize)]
 struct ImportRow {
     title: String,
-    // Blank cell -> None -> defaults to panel; `default` also tolerates the column being absent.
+    // Blank or absent -> defaults to panel.
     #[serde(default)]
     kind: Option<AttractionKind>,
     // Sheets record durations in hours (often fractional, e.g. 1.5); the DB stores minutes.
@@ -78,11 +73,10 @@ async fn import(
         return Err(AppError::NotFound);
     }
 
-    // Phase 1: validate everything before touching the DB.
     let rows = parse_and_validate(&body)?;
 
-    // Phase 2: write. Nothing here is visible until the final commit; an early return
-    // drops `tx` and Postgres rolls the whole import back.
+    // Nothing here is visible until the final commit; an early return drops `tx` and
+    // Postgres rolls the whole import back.
     let mut tx = state.pool.begin().await?;
     let mut panelist_ids: HashMap<String, Uuid> = HashMap::new();
     let mut summary = ImportSummary {
@@ -157,15 +151,14 @@ async fn import(
     Ok(Json(summary))
 }
 
-/// Phase 1: parse the CSV and validate every row with no database access. Returns the
+/// Parse the CSV and validate every row with no database access. Returns the
 /// DB-ready rows, or *all* the row-level errors at once (so one re-import fixes the sheet).
 fn parse_and_validate(body: &str) -> Result<Vec<ValidRow>, AppError> {
     // Spreadsheet exports often prepend a UTF-8 BOM; left in, it glues onto the first
     // header so `title` stops matching. Strip it before parsing.
     let csv_text = body.strip_prefix('\u{feff}').unwrap_or(body);
 
-    // `Trim::All` strips surrounding whitespace from every cell, so " panel " and
-    // "Alice, Bob " parse cleanly.
+    // `Trim::All` strips surrounding whitespace from every cell.
     let mut reader = csv::ReaderBuilder::new()
         .trim(csv::Trim::All)
         .from_reader(csv_text.as_bytes());
@@ -190,7 +183,10 @@ fn parse_and_validate(body: &str) -> Result<Vec<ValidRow>, AppError> {
         let row: ImportRow = match record.deserialize(Some(&headers)) {
             Ok(r) => r,
             Err(e) => {
-                errors.push(format!("row at line {line}: {}", describe_csv_error(&e, &headers)));
+                errors.push(format!(
+                    "row at line {line}: {}",
+                    describe_csv_error(&e, &headers)
+                ));
                 continue;
             }
         };
@@ -202,7 +198,9 @@ fn parse_and_validate(body: &str) -> Result<Vec<ValidRow>, AppError> {
         }
         // is_finite rejects NaN and infinities; the round guards a tiny value vanishing to 0.
         let duration_minutes = if !row.duration_hours.is_finite() || row.duration_hours <= 0.0 {
-            errors.push(format!("row at line {line}: duration_hours must be positive"));
+            errors.push(format!(
+                "row at line {line}: duration_hours must be positive"
+            ));
             0
         } else {
             let minutes = (row.duration_hours * 60.0).round() as i32;

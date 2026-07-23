@@ -44,7 +44,6 @@ pub struct CreateConvention {
 #[derive(Deserialize)]
 pub struct UpdateConvention {
     name: Option<String>,
-    // `default` lets an absent key deserialize to `None`.
     #[serde(default, with = "iso_date::option")]
     starts_on: Option<Date>,
     #[serde(default, with = "iso_date::option")]
@@ -55,7 +54,6 @@ pub struct UpdateConvention {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/conventions", get(list).post(create))
-        // axum 0.8 path-param syntax is `{id}` (older versions used `:id`).
         .route(
             "/conventions/{id}",
             get(get_one).patch(update).delete(delete),

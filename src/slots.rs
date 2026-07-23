@@ -170,13 +170,11 @@ async fn update(
         Some(slot) => Ok(Json(slot)),
         // Zero rows is ambiguous: a missing slot (404) or a cross-convention room (422).
         None => {
-            let slot_exists = sqlx::query_scalar!(
-                "SELECT EXISTS(SELECT 1 FROM slots WHERE id = $1)",
-                id,
-            )
-            .fetch_one(&state.pool)
-            .await?
-            .unwrap_or(false);
+            let slot_exists =
+                sqlx::query_scalar!("SELECT EXISTS(SELECT 1 FROM slots WHERE id = $1)", id,)
+                    .fetch_one(&state.pool)
+                    .await?
+                    .unwrap_or(false);
 
             if slot_exists {
                 Err(AppError::Validation(

@@ -130,7 +130,10 @@ async fn get_schedule(
         hosts_by_attraction
             .entry(h.attraction_id)
             .or_default()
-            .push(HostRef { id: h.panelist_id, nick: h.nick });
+            .push(HostRef {
+                id: h.panelist_id,
+                nick: h.nick,
+            });
     }
 
     let slots = rows
@@ -151,7 +154,9 @@ async fn get_schedule(
                 duration_minutes: row.duration_minutes,
             },
             // An attraction has at most one slot, so each id appears once -> remove is safe.
-            hosts: hosts_by_attraction.remove(&row.attraction_id).unwrap_or_default(),
+            hosts: hosts_by_attraction
+                .remove(&row.attraction_id)
+                .unwrap_or_default(),
         })
         .collect();
 

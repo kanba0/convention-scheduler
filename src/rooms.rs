@@ -51,10 +51,7 @@ pub struct UpdateRoom {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route(
-            "/conventions/{convention_id}/rooms",
-            get(list).post(create),
-        )
+        .route("/conventions/{convention_id}/rooms", get(list).post(create))
         .route("/rooms/{id}", get(get_one).patch(update).delete(delete))
 }
 
@@ -87,8 +84,7 @@ async fn create(
     Path(convention_id): Path<Uuid>,
     Json(body): Json<CreateRoom>,
 ) -> Result<(StatusCode, Json<Room>), AppError> {
-    // `$3::room_kind` casts the bound parameter to the ENUM so the macro can
-    // type-check it; a missing convention_id trips the FK -> 422 (see error.rs).
+    // `$3::room_kind` casts the bound parameter to the ENUM so the query macro can type-check it.
     let room = sqlx::query_as!(
         Room,
         r#"

@@ -59,9 +59,10 @@ impl IntoResponse for AppError {
                 (StatusCode::UNPROCESSABLE_ENTITY, json!({ "error": what }))
             }
             // A bulk import reports every bad row at once, so the body is a list.
-            AppError::ValidationList(errors) => {
-                (StatusCode::UNPROCESSABLE_ENTITY, json!({ "errors": errors }))
-            }
+            AppError::ValidationList(errors) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                json!({ "errors": errors }),
+            ),
             AppError::Conflict(what) => (StatusCode::CONFLICT, json!({ "error": what })),
             AppError::Database(err) => {
                 tracing::error!("database error: {err}");

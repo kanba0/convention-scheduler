@@ -95,8 +95,7 @@ async fn create(
     Path(convention_id): Path<Uuid>,
     Json(body): Json<CreateAttraction>,
 ) -> Result<(StatusCode, Json<Attraction>), AppError> {
-    // `$3::attraction_kind` casts the bound param to the ENUM for compile-time checking;
-    // a non-positive duration trips the CHECK -> 422, a bad convention_id the FK -> 422.
+    // `$3::attraction_kind` casts the bound param to the ENUM for compile-time checking.
     let attraction = sqlx::query_as!(
         Attraction,
         r#"

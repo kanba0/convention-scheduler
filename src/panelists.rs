@@ -46,10 +46,7 @@ pub fn router() -> Router<AppState> {
             "/conventions/{convention_id}/panelists",
             get(list).post(create),
         )
-        .route(
-            "/panelists/{id}",
-            get(get_one).patch(update).delete(delete),
-        )
+        .route("/panelists/{id}", get(get_one).patch(update).delete(delete))
 }
 
 /// `GET /conventions/{convention_id}/panelists` — hosts of one convention, by nick.
