@@ -16,18 +16,19 @@ grid with live conflict highlighting.
 
 ## Status
 
-Early development. Phases 1–3 are complete — the CRUD spine (conventions, rooms,
+Early development. Phases 1–4 are complete — the CRUD spine (conventions, rooms,
 panelists, attractions, host links, slots), the assembled `GET /schedule` view,
-bulk attraction import, and `GET /conventions/:id/conflicts` conflict detection.
-Hardening (Phase 4) is next. See the [Roadmap](#roadmap) below.
+bulk attraction import, `GET /conventions/:id/conflicts` conflict detection, and
+the hardening pass (integration tests, Dockerfile, CI). The schedule generator
+(Phase 5) is next. See the [Roadmap](#roadmap) below.
 
 ## Tech stack
 
 - **Rust** (edition 2024) with **axum** 0.8 (async HTTP)
 - **PostgreSQL** 17 via **sqlx** 0.8 (compile-time-checked queries, migrations)
 - **tokio** async runtime, **serde** for JSON, **tracing** for structured logs
-- **Docker Compose** for the local database
-- Integration tests + GitHub Actions CI (planned, phase 4)
+- **Docker Compose** for the local database, multi-stage **Dockerfile** for the app
+- Integration tests + GitHub Actions CI
 
 ## Getting started
 
@@ -102,7 +103,7 @@ drag/swap interaction, so the constraint would be redundant and only make edits 
 - [x] **Phase 3** — conflict detection (`GET /conventions/:id/conflicts`): room
   double-booking, panelist double-booking, and room-type mismatch, reported (not
   forbidden — the editor's drag/swap handles room occupancy; see TODO.md).
-- [ ] **Phase 4** — hardening: integration tests, Dockerfile, GitHub Actions CI
+- [x] **Phase 4** — hardening: integration tests, Dockerfile, GitHub Actions CI
   (`cargo test` + `cargo clippy -D warnings`).
 - [ ] **Phase 5** — schedule generator: auto-place attractions into slots from the
   constraints (hard rules: room type, availability, no double-booking; soft prefs
