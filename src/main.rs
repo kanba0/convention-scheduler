@@ -1,22 +1,8 @@
-mod attractions;
-mod conflicts;
-mod conventions;
-mod error;
-mod host_links;
-mod import;
-mod panelists;
-mod rooms;
-mod schedule;
-mod slots;
-mod state;
-
-use axum::{Json, Router, extract::State, routing::get};
-use serde_json::{Value, json};
-use sqlx::Row;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 
-use crate::state::AppState;
+use convention_scheduler::app;
+use convention_scheduler::state::AppState;
 
 #[tokio::main]
 async fn main() {
@@ -50,42 +36,13 @@ async fn main() {
         Err(e) => tracing::warn!("could not run migrations (is Postgres up?): {e}"),
     }
 
-    let state = AppState { pool };
-
-    let app = Router::new()
-        .route("/health", get(health))
-        .merge(conventions::router())
-        .merge(rooms::router())
-        .merge(panelists::router())
-        .merge(attractions::router())
-        .merge(import::router())
-        .merge(host_links::router())
-        .merge(slots::router())
-        .merge(schedule::router())
-        .merge(conflicts::router())
-        .with_state(state)
-        .layer(tower_http::trace::TraceLayer::new_for_http());
-
     let addr = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .expect("failed to bind listener");
     tracing::info!("listening on http://{addr}");
 
-    axum::serve(listener, app).await.expect("server error");
-}
-
-/// Liveness + DB connectivity probe. Always returns 200 so the process reports
-/// "alive"; the body reports whether Postgres is actually reachable.
-async fn health(State(state): State<AppState>) -> Json<Value> {
-    let db_up = sqlx::query("SELECT 1")
-        .fetch_one(&state.pool)
+    axum::serve(listener, app(AppState { pool }))
         .await
-        .and_then(|row| row.try_get::<i32, _>(0))
-        .is_ok();
-
-    Json(json!({
-        "status": "ok",
-        "db": if db_up { "up" } else { "down" },
-    }))
+        .expect("server error");
 }

@@ -25,3 +25,6 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenvy = "0.15"
 csv = "1"
+
+[dev-dependencies]
+axum-test = "21.0.0"
