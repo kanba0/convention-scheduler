@@ -54,10 +54,15 @@ hard write-time prevention rather than report-and-resolve.
 
 ## Panelists & availability
 
-- [ ] **Structured availability windows.** A `panelist_availability` table of
-  precise `(panelist_id, starts_at, ends_at)` windows — the machine-usable
-  source of truth for scheduling. The free-text `availability_note` stays only
-  as a human memo.
+- [x] **Structured availability windows.** Built in Phase 5.2 as the
+  `panelist_availability` table of precise `(panelist_id, starts_at, ends_at)`
+  windows — the machine-usable source of truth for scheduling. The free-text
+  `availability_note` stays only as a human memo. No windows = available whenever
+  the program runs (only restrictions are stored).
+- [ ] **Sanity nudge: availability that never meets the program.** A window that
+  doesn't intersect the program hours at all (e.g. wrong year) is likely a typo.
+  A soft heads-up for the GUI, not a hard check — availability outside hours is
+  otherwise just unused slack (the generator intersects it with program hours).
 - [ ] **Importer forces fuzzy → precise.** When importing a CSV/sheet, the user
   must convert fuzzy notes ("only Saturday till 18:00") into concrete windows.
   Precise availability makes conflict detection and auto-scheduling far easier.

@@ -9,6 +9,7 @@ mod conventions;
 mod error;
 mod host_links;
 mod import;
+mod panelist_availability;
 mod panelists;
 mod rooms;
 mod schedule;
@@ -31,6 +32,7 @@ pub fn app(state: AppState) -> Router {
         .merge(convention_days::router())
         .merge(rooms::router())
         .merge(panelists::router())
+        .merge(panelist_availability::router())
         .merge(attractions::router())
         .merge(import::router())
         .merge(host_links::router())
