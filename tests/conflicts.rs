@@ -1,5 +1,6 @@
 //! Integration tests for conflict detection (`GET /conventions/{id}/conflicts`).
 
+use serde_json::json;
 use sqlx::PgPool;
 
 mod common;
@@ -7,6 +8,30 @@ use common::{
     conflicts, create_attraction, create_convention, create_panelist, create_room, create_slot,
     link_host, server,
 };
+
+/// Set one day's program hours (helper for the outside-hours checks).
+async fn set_hours(
+    server: &axum_test::TestServer,
+    con: &str,
+    day: &str,
+    opens: &str,
+    closes: &str,
+) {
+    server
+        .patch(&format!("/conventions/{con}/days/{day}"))
+        .json(&json!({ "opens_at": opens, "closes_at": closes }))
+        .await
+        .assert_status_ok();
+}
+
+/// The `slot_outside_hours` conflicts from the report.
+async fn outside_hours(server: &axum_test::TestServer, con: &str) -> Vec<serde_json::Value> {
+    conflicts(server, con)
+        .await
+        .into_iter()
+        .filter(|c| c["type"] == "slot_outside_hours")
+        .collect()
+}
 
 #[sqlx::test]
 async fn clean_schedule_has_no_conflicts(pool: PgPool) {
@@ -190,6 +215,118 @@ async fn room_type_mismatch_flags_only_incompatible_rooms(pool: PgPool) {
     assert_eq!(c["type"], "room_type_mismatch");
     assert_eq!(c["slot"]["attraction_title"], "Cosplay");
     assert_eq!(c["room_name"], "Panel Room");
+}
+
+#[sqlx::test]
+async fn slot_ending_after_closing_is_flagged(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    set_hours(&server, &con, "2026-08-01", "14:00", "20:00").await;
+    let room = create_room(&server, &con, "Main Hall", "panel").await;
+    let late = create_attraction(&server, &con, "Late Panel", "panel", 30).await;
+    create_slot(
+        &server,
+        &con,
+        &late,
+        &room,
+        "2026-08-01T20:00:00Z",
+        "2026-08-01T21:00:00Z",
+    )
+    .await;
+
+    let outside = outside_hours(&server, &con).await;
+    assert_eq!(outside.len(), 1);
+    let c = &outside[0];
+    assert_eq!(c["slot"]["attraction_title"], "Late Panel");
+    assert_eq!(c["day"], "2026-08-01");
+    assert_eq!(c["opens_at"], "14:00");
+    assert_eq!(c["closes_at"], "20:00");
+}
+
+#[sqlx::test]
+async fn slot_starting_before_opening_is_flagged(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    set_hours(&server, &con, "2026-08-01", "14:00", "20:00").await;
+    let room = create_room(&server, &con, "Main Hall", "panel").await;
+    let early = create_attraction(&server, &con, "Early Panel", "panel", 30).await;
+    create_slot(
+        &server,
+        &con,
+        &early,
+        &room,
+        "2026-08-01T13:00:00Z",
+        "2026-08-01T13:30:00Z",
+    )
+    .await;
+
+    let outside = outside_hours(&server, &con).await;
+    assert_eq!(outside.len(), 1);
+    assert_eq!(outside[0]["slot"]["attraction_title"], "Early Panel");
+}
+
+#[sqlx::test]
+async fn slot_straddling_the_closing_edge_is_flagged(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    set_hours(&server, &con, "2026-08-01", "14:00", "20:00").await;
+    let room = create_room(&server, &con, "Main Hall", "panel").await;
+    // Starts inside hours (19:30) but runs past close (20:30) — only the tail spills over.
+    let over = create_attraction(&server, &con, "Overrun Panel", "panel", 60).await;
+    create_slot(
+        &server,
+        &con,
+        &over,
+        &room,
+        "2026-08-01T19:30:00Z",
+        "2026-08-01T20:30:00Z",
+    )
+    .await;
+
+    let outside = outside_hours(&server, &con).await;
+    assert_eq!(outside.len(), 1);
+    assert_eq!(outside[0]["slot"]["attraction_title"], "Overrun Panel");
+}
+
+#[sqlx::test]
+async fn slot_within_program_hours_is_not_flagged(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    set_hours(&server, &con, "2026-08-01", "14:00", "20:00").await;
+    let room = create_room(&server, &con, "Main Hall", "panel").await;
+    let panel = create_attraction(&server, &con, "On-Time Panel", "panel", 60).await;
+    create_slot(
+        &server,
+        &con,
+        &panel,
+        &room,
+        "2026-08-01T15:00:00Z",
+        "2026-08-01T16:00:00Z",
+    )
+    .await;
+
+    assert!(outside_hours(&server, &con).await.is_empty());
+}
+
+#[sqlx::test]
+async fn slot_on_a_day_with_unset_hours_is_not_flagged(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    // 2026-08-01's hours are set, but the slot lands on 2026-08-02, whose hours aren't.
+    set_hours(&server, &con, "2026-08-01", "14:00", "20:00").await;
+    let room = create_room(&server, &con, "Main Hall", "panel").await;
+    let panel = create_attraction(&server, &con, "Late Night", "panel", 30).await;
+    create_slot(
+        &server,
+        &con,
+        &panel,
+        &room,
+        "2026-08-02T23:00:00Z",
+        "2026-08-02T23:30:00Z",
+    )
+    .await;
+
+    assert!(outside_hours(&server, &con).await.is_empty());
 }
 
 #[sqlx::test]

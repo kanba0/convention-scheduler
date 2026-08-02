@@ -1,9 +1,10 @@
 //! `GET /conventions/{id}/conflicts` — the clashes organizers currently mark by hand
-//! on a colored grid, computed instead. Three checks, each read-only:
+//! on a colored grid, computed instead. Four checks, each read-only:
 //!
 //!   1. a room double-booked (two overlapping slots in one room),
 //!   2. a panelist double-booked (hosting two attractions whose slots overlap),
-//!   3. an attraction in a room whose type can't host its kind.
+//!   3. an attraction in a room whose type can't host its kind,
+//!   4. a slot placed outside its day's program hours.
 //!
 //! This is a *report*, not a guard: conflicts are tolerated and surfaced, the way the
 //! manual grid tolerates-and-highlights, so the operator can sit in a clashing state
@@ -13,13 +14,16 @@ use axum::extract::{Path, State};
 use axum::routing::get;
 use axum::{Json, Router};
 use serde::Serialize;
-use time::OffsetDateTime;
+use time::{Date, OffsetDateTime, Time};
 use uuid::Uuid;
 
 use crate::attractions::AttractionKind;
 use crate::error::AppError;
 use crate::rooms::RoomKind;
 use crate::state::AppState;
+
+time::serde::format_description!(iso_date, Date, "[year]-[month]-[day]");
+time::serde::format_description!(hh_mm, Time, "[hour]:[minute]");
 
 /// A slot reduced to what a conflict needs to point at it: its id, the attraction's
 /// title, and its time range. Enough for the grid to highlight the cell without a
@@ -58,6 +62,16 @@ enum Conflict {
         room_name: String,
         room_kind: RoomKind,
         attraction_kind: AttractionKind,
+    },
+    /// A slot falls outside its day's set program hours.
+    SlotOutsideHours {
+        slot: SlotRef,
+        #[serde(with = "iso_date")]
+        day: Date,
+        #[serde(with = "hh_mm")]
+        opens_at: Time,
+        #[serde(with = "hh_mm")]
+        closes_at: Time,
     },
 }
 
@@ -211,6 +225,46 @@ async fn conflicts(
             room_name: row.room_name,
             room_kind: row.room_kind,
             attraction_kind: row.attraction_kind,
+        });
+    }
+
+    // Check 4: slot outside its day's program hours. The day is matched by the slot's
+    // start date, and its window is built by adding the stored `time` hours to that date
+    // — read as UTC (v1 has no per-convention timezone), to match the timestamptz slots.
+    // Days whose hours aren't set yet are NULL and drop out of the join, so an
+    // unconfigured day is left un-judged rather than flagging everything on it.
+    let outside_rows = sqlx::query!(
+        r#"
+        SELECT s.id AS "slot_id!", a.title AS "attraction_title!",
+               s.starts_at AS "starts_at!", s.ends_at AS "ends_at!",
+               cd.day AS "day!", cd.opens_at AS "opens_at!", cd.closes_at AS "closes_at!"
+        FROM slots s
+        JOIN attractions a ON a.id = s.attraction_id
+        JOIN convention_days cd
+          ON cd.convention_id = a.convention_id
+         AND cd.day = (s.starts_at AT TIME ZONE 'UTC')::date
+        WHERE a.convention_id = $1
+          AND cd.opens_at IS NOT NULL
+          AND cd.closes_at IS NOT NULL
+          AND (s.starts_at < ((cd.day + cd.opens_at) AT TIME ZONE 'UTC')
+            OR s.ends_at   > ((cd.day + cd.closes_at) AT TIME ZONE 'UTC'))
+        ORDER BY s.starts_at
+        "#,
+        convention_id,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    for row in outside_rows {
+        conflicts.push(Conflict::SlotOutsideHours {
+            slot: SlotRef {
+                id: row.slot_id,
+                attraction_title: row.attraction_title,
+                starts_at: row.starts_at,
+                ends_at: row.ends_at,
+            },
+            day: row.day,
+            opens_at: row.opens_at,
+            closes_at: row.closes_at,
         });
     }
 

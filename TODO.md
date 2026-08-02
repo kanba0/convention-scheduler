@@ -64,8 +64,13 @@ hard write-time prevention rather than report-and-resolve.
 
 ## Convention structure
 
-- [ ] **Per-day program hours** (e.g. Fri 14–20, Sat 9–20, Sun 9–14) — likely a
-  `convention_days` table (date + open/close time).
+- [x] **Per-day program hours** (e.g. Fri 14–20, Sat 9–20, Sun 9–14) — built in
+  Phase 5.1 as the `convention_days` table (date + open/close), seeded from the
+  span on create, re-seeded additively on edit.
+- [ ] **Convention timezone.** Day hours are stored as naive `time` (no zone),
+  so the generator resolves day+time against a single assumed zone (UTC for v1).
+  Only matters if a con ever spans zones or needs DST-correct instants — most are
+  single-venue, single-zone, so this is far off. Would add a `timezone` column.
 - [ ] **Category hour budgets** (total hours for attractions / panels /
   contests), as planning aids.
 

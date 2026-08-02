@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE convention_days\n        SET opens_at = $3, closes_at = $4\n        WHERE convention_id = $1 AND day = $2\n        RETURNING day, opens_at, closes_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "day",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 1,
+        "name": "opens_at",
+        "type_info": "Time"
+      },
+      {
+        "ordinal": 2,
+        "name": "closes_at",
+        "type_info": "Time"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Time",
+        "Time"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "ee4a56d0341bec862abbc33b81833eab487aab7bbc6cbcff6006f2eab1253d5f"
+}

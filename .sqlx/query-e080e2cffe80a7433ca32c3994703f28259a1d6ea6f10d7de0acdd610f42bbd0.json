@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO convention_days (convention_id, day)\n        SELECT $1, series::date\n        FROM generate_series($2::date::timestamp, $3::date::timestamp, interval '1 day') AS series\n        ON CONFLICT (convention_id, day) DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e080e2cffe80a7433ca32c3994703f28259a1d6ea6f10d7de0acdd610f42bbd0"
+}

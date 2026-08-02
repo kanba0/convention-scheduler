@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT day, opens_at, closes_at\n        FROM convention_days\n        WHERE convention_id = $1\n        ORDER BY day\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "day",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 1,
+        "name": "opens_at",
+        "type_info": "Time"
+      },
+      {
+        "ordinal": 2,
+        "name": "closes_at",
+        "type_info": "Time"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "bdaf8821359d6afaa71a6b112e54f5f00d10703fed5d101e2b16f9df32d641ed"
+}

@@ -76,11 +76,13 @@ async fn list(State(state): State<AppState>) -> Result<Json<Vec<Convention>>, Ap
     Ok(Json(conventions))
 }
 
-/// `POST /conventions` — create one, return 201 with the created row.
+/// `POST /conventions` — create one, seed its program days, return 201.
 async fn create(
     State(state): State<AppState>,
     Json(body): Json<CreateConvention>,
 ) -> Result<(StatusCode, Json<Convention>), AppError> {
+    let mut tx = state.pool.begin().await?;
+
     let convention = sqlx::query_as!(
         Convention,
         r#"
@@ -92,8 +94,18 @@ async fn create(
         body.starts_on,
         body.ends_on,
     )
-    .fetch_one(&state.pool)
+    .fetch_one(&mut *tx)
     .await?;
+
+    crate::convention_days::seed(
+        &mut *tx,
+        convention.id,
+        convention.starts_on,
+        convention.ends_on,
+    )
+    .await?;
+
+    tx.commit().await?;
 
     Ok((StatusCode::CREATED, Json(convention)))
 }
@@ -125,6 +137,8 @@ async fn update(
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateConvention>,
 ) -> Result<Json<Convention>, AppError> {
+    let mut tx = state.pool.begin().await?;
+
     // COALESCE($n, col) keeps the existing value when the bound argument is NULL,
     // so an omitted PATCH field (None -> NULL) falls through to the current column.
     // This keeps PATCH a single static query the macro can verify at compile time.
@@ -143,9 +157,20 @@ async fn update(
         body.starts_on,
         body.ends_on,
     )
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *tx)
     .await?
     .ok_or(AppError::NotFound)?;
+
+    // Additively cover a grown span; existing days (and out-of-range ones) stay put.
+    crate::convention_days::seed(
+        &mut *tx,
+        convention.id,
+        convention.starts_on,
+        convention.ends_on,
+    )
+    .await?;
+
+    tx.commit().await?;
 
     Ok(Json(convention))
 }

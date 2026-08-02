@@ -4,6 +4,7 @@
 
 mod attractions;
 mod conflicts;
+mod convention_days;
 mod conventions;
 mod error;
 mod host_links;
@@ -27,6 +28,7 @@ pub fn app(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .merge(conventions::router())
+        .merge(convention_days::router())
         .merge(rooms::router())
         .merge(panelists::router())
         .merge(attractions::router())
