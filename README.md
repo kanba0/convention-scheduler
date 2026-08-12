@@ -105,9 +105,11 @@ drag/swap interaction, so the constraint would be redundant and only make edits 
   forbidden — the editor's drag/swap handles room occupancy; see TODO.md).
 - [x] **Phase 4** — hardening: integration tests, Dockerfile, GitHub Actions CI
   (`cargo test` + `cargo clippy -D warnings`).
-- [ ] **Phase 5** — schedule generator: auto-place attractions into slots from the
-  constraints (hard rules: room type, availability, no double-booking; soft prefs
-  as bias).
+- [ ] **Phase 5** — schedule generator: propose placements from the hard
+  constraints (room type, program hours, panelist availability, no
+  double-booking), report what wouldn't fit, and let the operator review and save
+  the plan. Soft preferences (prime time, alignment, spreading a panelist's
+  sessions) are deliberately deferred — see TODO.md.
 - [ ] **Phase 6** — operator GUI (in-repo, non-Rust frontend): view the schedule
   grid, drag attractions between room×time cells, live conflict colours — the core
   product surface. Intertwined with Phase 5 (a viewer is how you test the generator).
