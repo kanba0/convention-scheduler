@@ -7,6 +7,7 @@ mod conflicts;
 mod convention_days;
 mod conventions;
 mod error;
+pub mod generator;
 mod host_links;
 mod import;
 mod panelist_availability;
