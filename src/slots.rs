@@ -4,7 +4,7 @@
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use time::{OffsetDateTime, PrimitiveDateTime};
@@ -56,6 +56,7 @@ pub struct UpdateSlot {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/conventions/{convention_id}/slots", get(list).post(create))
+        .route("/conventions/{convention_id}/slots/bulk", post(create_bulk))
         .route("/slots/{id}", get(get_one).patch(update).delete(delete))
 }
 
@@ -113,6 +114,55 @@ async fn create(
     })?;
 
     Ok((StatusCode::CREATED, Json(slot)))
+}
+
+/// `POST /conventions/{convention_id}/slots/bulk` — save a whole plan at once.
+/// An attraction that already has a slot is moved rather than rejected, and a
+/// clashing or half-finished plan saves fine: conflicts are reported, not forbidden.
+async fn create_bulk(
+    State(state): State<AppState>,
+    Path(convention_id): Path<Uuid>,
+    Json(body): Json<Vec<CreateSlot>>,
+) -> Result<Json<Vec<Slot>>, AppError> {
+    // An early return drops `tx`, so one bad placement rolls the whole batch back.
+    let mut tx = state.pool.begin().await?;
+    let mut saved = Vec::with_capacity(body.len());
+
+    for placement in body {
+        let slot = sqlx::query_as!(
+            Slot,
+            r#"
+            INSERT INTO slots (attraction_id, room_id, starts_at, ends_at)
+            SELECT a.id, r.id, $4, $5
+            FROM attractions a, rooms r
+            WHERE a.id = $2 AND r.id = $3
+              AND a.convention_id = $1 AND r.convention_id = $1
+            ON CONFLICT (attraction_id) DO UPDATE
+                SET room_id   = EXCLUDED.room_id,
+                    starts_at = EXCLUDED.starts_at,
+                    ends_at   = EXCLUDED.ends_at
+            RETURNING id, attraction_id, room_id, starts_at, ends_at, created_at, updated_at
+            "#,
+            convention_id,
+            placement.attraction_id,
+            placement.room_id,
+            placement.starts_at,
+            placement.ends_at,
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| {
+            AppError::Validation(
+                "attraction and room must both belong to this convention".to_string(),
+            )
+        })?;
+
+        saved.push(slot);
+    }
+
+    tx.commit().await?;
+
+    Ok(Json(saved))
 }
 
 /// `GET /slots/{id}` — one placement, or 404.

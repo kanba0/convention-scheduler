@@ -16,11 +16,14 @@ grid with live conflict highlighting.
 
 ## Status
 
-Early development. Phases 1–4 are complete — the CRUD spine (conventions, rooms,
+Early development. Phases 1–5 are complete — the CRUD spine (conventions, rooms,
 panelists, attractions, host links, slots), the assembled `GET /schedule` view,
-bulk attraction import, `GET /conventions/:id/conflicts` conflict detection, and
-the hardening pass (integration tests, Dockerfile, CI). The schedule generator
-(Phase 5) is next. See the [Roadmap](#roadmap) below.
+bulk attraction import, `GET /conventions/:id/conflicts` conflict detection, the
+hardening pass (integration tests, Dockerfile, CI), and the schedule generator
+(per-day program hours, panelist availability windows,
+`GET /conventions/:id/schedule/generate` to propose a plan, and
+`POST /conventions/:id/slots/bulk` to save a reviewed one). The operator GUI
+(Phase 6) is next. See the [Roadmap](#roadmap) below.
 
 ## Tech stack
 
@@ -105,7 +108,7 @@ drag/swap interaction, so the constraint would be redundant and only make edits 
   forbidden — the editor's drag/swap handles room occupancy; see TODO.md).
 - [x] **Phase 4** — hardening: integration tests, Dockerfile, GitHub Actions CI
   (`cargo test` + `cargo clippy -D warnings`).
-- [ ] **Phase 5** — schedule generator: propose placements from the hard
+- [x] **Phase 5** — schedule generator: propose placements from the hard
   constraints (room type, program hours, panelist availability, no
   double-booking), report what wouldn't fit, and let the operator review and save
   the plan. Soft preferences (prime time, alignment, spreading a panelist's
