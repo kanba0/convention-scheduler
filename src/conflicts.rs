@@ -14,13 +14,14 @@ use axum::extract::{Path, State};
 use axum::routing::get;
 use axum::{Json, Router};
 use serde::Serialize;
-use time::{Date, OffsetDateTime, Time};
+use time::{Date, PrimitiveDateTime, Time};
 use uuid::Uuid;
 
 use crate::attractions::AttractionKind;
 use crate::error::AppError;
 use crate::rooms::RoomKind;
 use crate::state::AppState;
+use crate::wall_clock::local_datetime;
 
 time::serde::format_description!(iso_date, Date, "[year]-[month]-[day]");
 time::serde::format_description!(hh_mm, Time, "[hour]:[minute]");
@@ -32,10 +33,10 @@ time::serde::format_description!(hh_mm, Time, "[hour]:[minute]");
 struct SlotRef {
     id: Uuid,
     attraction_title: String,
-    #[serde(with = "time::serde::rfc3339")]
-    starts_at: OffsetDateTime,
-    #[serde(with = "time::serde::rfc3339")]
-    ends_at: OffsetDateTime,
+    #[serde(with = "local_datetime")]
+    starts_at: PrimitiveDateTime,
+    #[serde(with = "local_datetime")]
+    ends_at: PrimitiveDateTime,
 }
 
 /// One detected clash. `tag = "type"` puts a discriminator field on the wire
@@ -117,7 +118,7 @@ async fn conflicts(
         JOIN attractions a2 ON a2.id = s2.attraction_id
         JOIN rooms r ON r.id = s1.room_id
         WHERE a1.convention_id = $1
-          AND tstzrange(s1.starts_at, s1.ends_at) && tstzrange(s2.starts_at, s2.ends_at)
+          AND tsrange(s1.starts_at, s1.ends_at) && tsrange(s2.starts_at, s2.ends_at)
         ORDER BY s1.starts_at
         "#,
         convention_id,
@@ -165,7 +166,7 @@ async fn conflicts(
         JOIN attractions a1 ON a1.id = s1.attraction_id
         JOIN attractions a2 ON a2.id = s2.attraction_id
         WHERE a1.convention_id = $1
-          AND tstzrange(s1.starts_at, s1.ends_at) && tstzrange(s2.starts_at, s2.ends_at)
+          AND tsrange(s1.starts_at, s1.ends_at) && tsrange(s2.starts_at, s2.ends_at)
         ORDER BY p.nick
         "#,
         convention_id,
@@ -229,8 +230,7 @@ async fn conflicts(
     }
 
     // Check 4: slot outside its day's program hours. The day is matched by the slot's
-    // start date, and its window is built by adding the stored `time` hours to that date
-    // — read as UTC (v1 has no per-convention timezone), to match the timestamptz slots.
+    // start date, and its window is built by adding the stored `time` hours to that date.
     // Days whose hours aren't set yet are NULL and drop out of the join, so an
     // unconfigured day is left un-judged rather than flagging everything on it.
     let outside_rows = sqlx::query!(
@@ -242,12 +242,12 @@ async fn conflicts(
         JOIN attractions a ON a.id = s.attraction_id
         JOIN convention_days cd
           ON cd.convention_id = a.convention_id
-         AND cd.day = (s.starts_at AT TIME ZONE 'UTC')::date
+         AND cd.day = s.starts_at::date
         WHERE a.convention_id = $1
           AND cd.opens_at IS NOT NULL
           AND cd.closes_at IS NOT NULL
-          AND (s.starts_at < ((cd.day + cd.opens_at) AT TIME ZONE 'UTC')
-            OR s.ends_at   > ((cd.day + cd.closes_at) AT TIME ZONE 'UTC'))
+          AND (s.starts_at < cd.day + cd.opens_at
+            OR s.ends_at   > cd.day + cd.closes_at)
         ORDER BY s.starts_at
         "#,
         convention_id,

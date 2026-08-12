@@ -8,13 +8,14 @@ use axum::extract::{Path, State};
 use axum::routing::get;
 use axum::{Json, Router};
 use serde::Serialize;
-use time::{Date, OffsetDateTime};
+use time::{Date, PrimitiveDateTime};
 use uuid::Uuid;
 
 use crate::attractions::AttractionKind;
 use crate::error::AppError;
 use crate::rooms::RoomKind;
 use crate::state::AppState;
+use crate::wall_clock::local_datetime;
 
 // `Date` has no rfc3339 (no timezone), so its wire format is explicit (as in conventions).
 time::serde::format_description!(iso_date, Date, "[year]-[month]-[day]");
@@ -40,10 +41,10 @@ struct ConventionSummary {
 #[derive(Serialize)]
 struct ScheduledSlot {
     id: Uuid,
-    #[serde(with = "time::serde::rfc3339")]
-    starts_at: OffsetDateTime,
-    #[serde(with = "time::serde::rfc3339")]
-    ends_at: OffsetDateTime,
+    #[serde(with = "local_datetime")]
+    starts_at: PrimitiveDateTime,
+    #[serde(with = "local_datetime")]
+    ends_at: PrimitiveDateTime,
     room: RoomRef,
     attraction: AttractionRef,
     hosts: Vec<HostRef>,

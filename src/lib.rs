@@ -15,6 +15,7 @@ mod rooms;
 mod schedule;
 mod slots;
 pub mod state;
+mod wall_clock;
 
 use axum::{Json, Router, extract::State, routing::get};
 use serde_json::{Value, json};

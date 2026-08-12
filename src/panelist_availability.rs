@@ -7,28 +7,29 @@ use axum::http::StatusCode;
 use axum::routing::{delete, get};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+use time::PrimitiveDateTime;
 use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::state::AppState;
+use crate::wall_clock::local_datetime;
 
 /// One availability window, as returned to clients.
 #[derive(Serialize)]
 pub struct AvailabilityWindow {
     id: Uuid,
-    #[serde(with = "time::serde::rfc3339")]
-    starts_at: OffsetDateTime,
-    #[serde(with = "time::serde::rfc3339")]
-    ends_at: OffsetDateTime,
+    #[serde(with = "local_datetime")]
+    starts_at: PrimitiveDateTime,
+    #[serde(with = "local_datetime")]
+    ends_at: PrimitiveDateTime,
 }
 
 #[derive(Deserialize)]
 pub struct CreateWindow {
-    #[serde(with = "time::serde::rfc3339")]
-    starts_at: OffsetDateTime,
-    #[serde(with = "time::serde::rfc3339")]
-    ends_at: OffsetDateTime,
+    #[serde(with = "local_datetime")]
+    starts_at: PrimitiveDateTime,
+    #[serde(with = "local_datetime")]
+    ends_at: PrimitiveDateTime,
 }
 
 pub fn router() -> Router<AppState> {

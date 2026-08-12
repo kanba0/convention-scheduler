@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT s.id AS \"slot_id!\", a.title AS \"attraction_title!\",\n               s.starts_at AS \"starts_at!\", s.ends_at AS \"ends_at!\",\n               cd.day AS \"day!\", cd.opens_at AS \"opens_at!\", cd.closes_at AS \"closes_at!\"\n        FROM slots s\n        JOIN attractions a ON a.id = s.attraction_id\n        JOIN convention_days cd\n          ON cd.convention_id = a.convention_id\n         AND cd.day = s.starts_at::date\n        WHERE a.convention_id = $1\n          AND cd.opens_at IS NOT NULL\n          AND cd.closes_at IS NOT NULL\n          AND (s.starts_at < cd.day + cd.opens_at\n            OR s.ends_at   > cd.day + cd.closes_at)\n        ORDER BY s.starts_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "slot_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "attraction_title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "starts_at!",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 3,
+        "name": "ends_at!",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 4,
+        "name": "day!",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 5,
+        "name": "opens_at!",
+        "type_info": "Time"
+      },
+      {
+        "ordinal": 6,
+        "name": "closes_at!",
+        "type_info": "Time"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "53397f7e9763c0343243d010967e1430d249fe294d30a5008e4f3621cf51d412"
+}

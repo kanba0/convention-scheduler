@@ -11,19 +11,19 @@
       {
         "ordinal": 1,
         "name": "starts_at",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamp"
       },
       {
         "ordinal": 2,
         "name": "ends_at",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamp"
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
-        "Timestamptz",
-        "Timestamptz"
+        "Timestamp",
+        "Timestamp"
       ]
     },
     "nullable": [

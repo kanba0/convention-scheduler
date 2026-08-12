@@ -22,8 +22,8 @@ async fn schedule_stitches_slot_with_room_attraction_and_hosts(pool: PgPool) {
         &con,
         &attraction,
         &room,
-        "2026-08-01T10:00:00Z",
-        "2026-08-01T11:00:00Z",
+        "2026-08-01T10:00:00",
+        "2026-08-01T11:00:00",
     )
     .await;
 

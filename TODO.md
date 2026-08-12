@@ -31,6 +31,24 @@ hard write-time prevention rather than report-and-resolve.
   run at the same time" even when they share no panelists — e.g. similar theme,
   same target audience. A constraint between attractions, not via people.
 - [ ] **Prime-time / time-of-day preferences** per attraction (soft).
+- [ ] **Derive the placement sort order from the data**, rather than the v1
+  hardcoded "contests → most-hosts → longest". Look at which attraction kinds are
+  most/least common and which rooms can host each, and order by genuine scarcity
+  (a kind only one room can host is more constrained than the raw contests-first
+  guess). Pairs with the room↔attraction compatibility map under *Rooms*.
+- [ ] **Derive grid granularity from actual durations.** v1 enumerates candidate
+  starts on a fixed 1h grid. If the program has 45-min panels it needs a 15-min
+  grid; if everything is 1h, 1h is fine. Compute the step from the durations
+  present (roughly a gcd of them) instead of assuming one.
+- [ ] **Back-to-back alignment of odd durations.** When most panels are 1h but a
+  few are 30 min, pack the short ones consecutively so the long ones keep landing
+  on the same clean start/end times, instead of letting one 30-min panel shift
+  everything after it off the hour. A soft alignment preference for the generator.
+- [ ] **Rank by panelist slack, not host count.** v1 orders "hardest first" partly
+  by number of hosts, which is a crude proxy: an attraction whose one host is only
+  free for a two-hour window is far more constrained than one with three hosts who
+  are free all weekend. Measure how much free time each host actually has against
+  the program, and rank by the tightest.
 
 ## Rooms
 
@@ -39,6 +57,13 @@ hard write-time prevention rather than report-and-resolve.
 - [ ] **Room class beyond kind** — for example, "main stage". A stage hosts its own category of things
   (cosplay contest, concert, big-guest meetup) and seats far more people. Needs
   its own modelling, not an enum value.
+- [ ] **Duration-restricted rooms** — e.g. a "speedroom" that only ever hosts
+  30-min panels. A room-level constraint on what durations it accepts, which the
+  generator's hard constraints would read alongside the kind match.
+- [ ] **Rename the `panel_contest` room kind** to something like `general` or
+  `attraction_room`. The name only makes sense while exactly two attraction kinds
+  exist; a third turns it into a lie. Cheap when it happens (`ALTER TYPE room_kind
+  RENAME VALUE`, no table rewrite, plus the Rust variant and its serde/sqlx names).
 - [ ] **Explicit room↔attraction compatibility map.** The phase-3 room-type check
   (`r.kind::text <> a.kind::text`, with `panel_contest` hardcoded as the permissive
   case) only holds while the two enums share labels and there's exactly one "allows
@@ -59,6 +84,13 @@ hard write-time prevention rather than report-and-resolve.
   windows — the machine-usable source of truth for scheduling. The free-text
   `availability_note` stays only as a human memo. No windows = available whenever
   the program runs (only restrictions are stored).
+- [ ] **Adjacent windows: merge, or keep them separate on purpose?** The generator
+  requires one single window to contain a whole slot, so back-to-back windows
+  (10–12 and 12–14) won't cover an 11–13 panel even though the person is plainly
+  free the whole time. Merging touching windows is the obvious fix — but a
+  panelist may also mean two windows as *alternatives* ("this one **or** that one,
+  not both"), which merging would destroy. Needs its own design discussion before
+  either behaviour is baked in.
 - [ ] **Sanity nudge: availability that never meets the program.** A window that
   doesn't intersect the program hours at all (e.g. wrong year) is likely a typo.
   A soft heads-up for the GUI, not a hard check — availability outside hours is
@@ -72,10 +104,11 @@ hard write-time prevention rather than report-and-resolve.
 - [x] **Per-day program hours** (e.g. Fri 14–20, Sat 9–20, Sun 9–14) — built in
   Phase 5.1 as the `convention_days` table (date + open/close), seeded from the
   span on create, re-seeded additively on edit.
-- [ ] **Convention timezone.** Day hours are stored as naive `time` (no zone),
-  so the generator resolves day+time against a single assumed zone (UTC for v1).
-  Only matters if a con ever spans zones or needs DST-correct instants — most are
-  single-venue, single-zone, so this is far off. Would add a `timezone` column.
+- [x] **Convention timezone — dissolved, not deferred.** Program times are venue
+  wall clock, so there's no zone to resolve them against: slots and availability
+  windows became `timestamp` (no zone) in migration 0005, while `created_at` /
+  `updated_at` stay `timestamptz` because those really are instants. Only a con
+  spanning two zones would reopen this.
 - [ ] **Category hour budgets** (total hours for attractions / panels /
   contests), as planning aids.
 

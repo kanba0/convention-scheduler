@@ -49,8 +49,8 @@ async fn clean_schedule_has_no_conflicts(pool: PgPool) {
         &con,
         &a,
         &room,
-        "2026-08-01T10:00:00Z",
-        "2026-08-01T11:00:00Z",
+        "2026-08-01T10:00:00",
+        "2026-08-01T11:00:00",
     )
     .await;
     create_slot(
@@ -58,8 +58,8 @@ async fn clean_schedule_has_no_conflicts(pool: PgPool) {
         &con,
         &b,
         &room,
-        "2026-08-01T12:00:00Z",
-        "2026-08-01T13:00:00Z",
+        "2026-08-01T12:00:00",
+        "2026-08-01T13:00:00",
     )
     .await;
 
@@ -79,8 +79,8 @@ async fn room_double_booked_is_reported(pool: PgPool) {
         &con,
         &early,
         &room,
-        "2026-08-01T10:00:00Z",
-        "2026-08-01T11:00:00Z",
+        "2026-08-01T10:00:00",
+        "2026-08-01T11:00:00",
     )
     .await;
     create_slot(
@@ -88,8 +88,8 @@ async fn room_double_booked_is_reported(pool: PgPool) {
         &con,
         &late,
         &room,
-        "2026-08-01T10:30:00Z",
-        "2026-08-01T11:30:00Z",
+        "2026-08-01T10:30:00",
+        "2026-08-01T11:30:00",
     )
     .await;
 
@@ -123,8 +123,8 @@ async fn touching_slots_do_not_conflict(pool: PgPool) {
         &con,
         &a,
         &room,
-        "2026-08-01T10:00:00Z",
-        "2026-08-01T11:00:00Z",
+        "2026-08-01T10:00:00",
+        "2026-08-01T11:00:00",
     )
     .await;
     create_slot(
@@ -132,8 +132,8 @@ async fn touching_slots_do_not_conflict(pool: PgPool) {
         &con,
         &b,
         &room,
-        "2026-08-01T11:00:00Z",
-        "2026-08-01T12:00:00Z",
+        "2026-08-01T11:00:00",
+        "2026-08-01T12:00:00",
     )
     .await;
 
@@ -159,8 +159,8 @@ async fn panelist_double_booked_is_reported(pool: PgPool) {
         &con,
         &alpha,
         &room1,
-        "2026-08-01T10:00:00Z",
-        "2026-08-01T11:00:00Z",
+        "2026-08-01T10:00:00",
+        "2026-08-01T11:00:00",
     )
     .await;
     create_slot(
@@ -168,8 +168,8 @@ async fn panelist_double_booked_is_reported(pool: PgPool) {
         &con,
         &beta,
         &room2,
-        "2026-08-01T10:30:00Z",
-        "2026-08-01T11:30:00Z",
+        "2026-08-01T10:30:00",
+        "2026-08-01T11:30:00",
     )
     .await;
 
@@ -193,8 +193,8 @@ async fn room_type_mismatch_flags_only_incompatible_rooms(pool: PgPool) {
         &con,
         &cosplay,
         &panel_room,
-        "2026-08-01T10:00:00Z",
-        "2026-08-01T11:00:00Z",
+        "2026-08-01T10:00:00",
+        "2026-08-01T11:00:00",
     )
     .await;
     // A panel_contest room hosts any kind, so this contest is fine there.
@@ -204,8 +204,8 @@ async fn room_type_mismatch_flags_only_incompatible_rooms(pool: PgPool) {
         &con,
         &karaoke,
         &flex_room,
-        "2026-08-01T10:00:00Z",
-        "2026-08-01T11:00:00Z",
+        "2026-08-01T10:00:00",
+        "2026-08-01T11:00:00",
     )
     .await;
 
@@ -229,8 +229,8 @@ async fn slot_ending_after_closing_is_flagged(pool: PgPool) {
         &con,
         &late,
         &room,
-        "2026-08-01T20:00:00Z",
-        "2026-08-01T21:00:00Z",
+        "2026-08-01T20:00:00",
+        "2026-08-01T21:00:00",
     )
     .await;
 
@@ -255,8 +255,8 @@ async fn slot_starting_before_opening_is_flagged(pool: PgPool) {
         &con,
         &early,
         &room,
-        "2026-08-01T13:00:00Z",
-        "2026-08-01T13:30:00Z",
+        "2026-08-01T13:00:00",
+        "2026-08-01T13:30:00",
     )
     .await;
 
@@ -278,8 +278,8 @@ async fn slot_straddling_the_closing_edge_is_flagged(pool: PgPool) {
         &con,
         &over,
         &room,
-        "2026-08-01T19:30:00Z",
-        "2026-08-01T20:30:00Z",
+        "2026-08-01T19:30:00",
+        "2026-08-01T20:30:00",
     )
     .await;
 
@@ -300,8 +300,8 @@ async fn slot_within_program_hours_is_not_flagged(pool: PgPool) {
         &con,
         &panel,
         &room,
-        "2026-08-01T15:00:00Z",
-        "2026-08-01T16:00:00Z",
+        "2026-08-01T15:00:00",
+        "2026-08-01T16:00:00",
     )
     .await;
 
@@ -321,8 +321,8 @@ async fn slot_on_a_day_with_unset_hours_is_not_flagged(pool: PgPool) {
         &con,
         &panel,
         &room,
-        "2026-08-02T23:00:00Z",
-        "2026-08-02T23:30:00Z",
+        "2026-08-02T23:00:00",
+        "2026-08-02T23:30:00",
     )
     .await;
 

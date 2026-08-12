@@ -7,11 +7,12 @@ use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+use time::{OffsetDateTime, PrimitiveDateTime};
 use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::state::AppState;
+use crate::wall_clock::local_datetime;
 
 /// A full slot row, as returned to clients.
 #[derive(Serialize)]
@@ -19,10 +20,10 @@ pub struct Slot {
     id: Uuid,
     attraction_id: Uuid,
     room_id: Uuid,
-    #[serde(with = "time::serde::rfc3339")]
-    starts_at: OffsetDateTime,
-    #[serde(with = "time::serde::rfc3339")]
-    ends_at: OffsetDateTime,
+    #[serde(with = "local_datetime")]
+    starts_at: PrimitiveDateTime,
+    #[serde(with = "local_datetime")]
+    ends_at: PrimitiveDateTime,
     #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]
@@ -35,10 +36,10 @@ pub struct Slot {
 pub struct CreateSlot {
     attraction_id: Uuid,
     room_id: Uuid,
-    #[serde(with = "time::serde::rfc3339")]
-    starts_at: OffsetDateTime,
-    #[serde(with = "time::serde::rfc3339")]
-    ends_at: OffsetDateTime,
+    #[serde(with = "local_datetime")]
+    starts_at: PrimitiveDateTime,
+    #[serde(with = "local_datetime")]
+    ends_at: PrimitiveDateTime,
 }
 
 /// Accepted on PATCH — move the placement. `attraction_id` is fixed (a slot *is*
@@ -46,10 +47,10 @@ pub struct CreateSlot {
 #[derive(Deserialize)]
 pub struct UpdateSlot {
     room_id: Option<Uuid>,
-    #[serde(default, with = "time::serde::rfc3339::option")]
-    starts_at: Option<OffsetDateTime>,
-    #[serde(default, with = "time::serde::rfc3339::option")]
-    ends_at: Option<OffsetDateTime>,
+    #[serde(default, with = "local_datetime::option")]
+    starts_at: Option<PrimitiveDateTime>,
+    #[serde(default, with = "local_datetime::option")]
+    ends_at: Option<PrimitiveDateTime>,
 }
 
 pub fn router() -> Router<AppState> {
