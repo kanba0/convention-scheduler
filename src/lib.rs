@@ -41,6 +41,7 @@ pub fn app(state: AppState) -> Router {
         .merge(slots::router())
         .merge(schedule::router())
         .merge(conflicts::router())
+        .merge(generator::router())
         .with_state(state)
         .layer(tower_http::trace::TraceLayer::new_for_http())
 }

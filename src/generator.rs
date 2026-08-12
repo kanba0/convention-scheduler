@@ -1,270 +1,183 @@
-//! Greedy schedule generation: hardest-to-place attractions first, each taking
-//! the first candidate slot that breaks no hard constraint. Pure — no database
-//! access, and nothing here writes; the caller decides what to do with the plan.
+//! `GET /conventions/{id}/schedule/generate` — propose a placement for every
+//! attraction that doesn't have one yet, leaving existing slots untouched. Nothing
+//! is written; saving the plan is a separate step. This module loads, [`engine`]
+//! packs and never touches a database.
+
+mod engine;
 
 use std::collections::HashMap;
 
-use serde::Serialize;
-use time::{Date, Duration, PrimitiveDateTime, Time};
+use axum::extract::{Path, State};
+use axum::routing::get;
+use axum::{Json, Router};
 use uuid::Uuid;
 
 pub use crate::attractions::AttractionKind;
 pub use crate::rooms::RoomKind;
-use crate::wall_clock::local_datetime;
+pub use engine::{
+    Busy, Day, GenerateInput, PlacedSlot, Plan, Room, ToPlace, Unplaced, UnplacedReason, Window,
+    generate,
+};
 
-/// A program day. Days with unset hours can't be scheduled into, so they never reach here.
-pub struct Day {
-    pub date: Date,
-    pub opens_at: Time,
-    pub closes_at: Time,
-}
+use crate::error::AppError;
+use crate::state::AppState;
 
-pub struct Room {
-    pub id: Uuid,
-    pub kind: RoomKind,
-}
+/// Deriving the step from the durations in play is a TODO, so it isn't requestable yet.
+const STEP_MINUTES: i64 = 60;
 
-pub struct ToPlace {
-    pub id: Uuid,
-    pub kind: AttractionKind,
-    pub duration_minutes: i32,
-    pub host_ids: Vec<Uuid>,
-}
-
-pub struct Window {
-    pub starts_at: PrimitiveDateTime,
-    pub ends_at: PrimitiveDateTime,
-}
-
-/// An occupied span — an existing slot, or one this run just placed. Blocks its
-/// room *and* its hosts.
-pub struct Busy {
-    pub room_id: Uuid,
-    pub host_ids: Vec<Uuid>,
-    pub starts_at: PrimitiveDateTime,
-    pub ends_at: PrimitiveDateTime,
-}
-
-pub struct GenerateInput {
-    pub days: Vec<Day>,
-    pub rooms: Vec<Room>,
-    pub to_place: Vec<ToPlace>,
-    /// A panelist absent from the map stated no restrictions — free whenever the program runs.
-    pub availability: HashMap<Uuid, Vec<Window>>,
-    pub busy: Vec<Busy>,
-    pub step_minutes: i64,
-}
-
-#[derive(Debug, Serialize)]
-pub struct PlacedSlot {
-    pub attraction_id: Uuid,
-    pub room_id: Uuid,
-    #[serde(with = "local_datetime")]
-    pub starts_at: PrimitiveDateTime,
-    #[serde(with = "local_datetime")]
-    pub ends_at: PrimitiveDateTime,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum UnplacedReason {
-    NoCompatibleRoom,
-    DoesNotFitAnyDay,
-    HostsNeverAvailable,
-    NoFreeSlot,
-}
-
-#[derive(Debug, Serialize)]
-pub struct Unplaced {
-    pub attraction_id: Uuid,
-    pub reason: UnplacedReason,
-}
-
-#[derive(Debug, Serialize)]
-pub struct Plan {
-    pub placed: Vec<PlacedSlot>,
-    pub unplaced: Vec<Unplaced>,
-}
-
-/// Propose a placement for each attraction in `to_place`, scheduling around `busy`.
-pub fn generate(input: GenerateInput) -> Plan {
-    let GenerateInput {
-        days,
-        rooms,
-        mut to_place,
-        availability,
-        mut busy,
-        step_minutes,
-    } = input;
-
-    to_place.sort_by(|a, b| {
-        kind_rank(a.kind)
-            .cmp(&kind_rank(b.kind))
-            .then(b.host_ids.len().cmp(&a.host_ids.len()))
-            .then(b.duration_minutes.cmp(&a.duration_minutes))
-            // Ids last, so equally-constrained attractions place in a stable order.
-            .then(a.id.cmp(&b.id))
-    });
-
-    let step = Duration::minutes(step_minutes.max(1));
-    let mut placed = Vec::new();
-    let mut unplaced = Vec::new();
-
-    for attraction in &to_place {
-        match place(attraction, &days, &rooms, &availability, &busy, step) {
-            Ok(slot) => {
-                busy.push(Busy {
-                    room_id: slot.room_id,
-                    host_ids: attraction.host_ids.clone(),
-                    starts_at: slot.starts_at,
-                    ends_at: slot.ends_at,
-                });
-                placed.push(slot);
-            }
-            Err(reason) => unplaced.push(Unplaced {
-                attraction_id: attraction.id,
-                reason,
-            }),
-        }
-    }
-
-    Plan { placed, unplaced }
-}
-
-/// First candidate slot breaking no hard constraint. The flags record how far the
-/// scan got, so a failure names its cause instead of a blanket "didn't fit".
-fn place(
-    attraction: &ToPlace,
-    days: &[Day],
-    rooms: &[Room],
-    availability: &HashMap<Uuid, Vec<Window>>,
-    busy: &[Busy],
-    step: Duration,
-) -> Result<PlacedSlot, UnplacedReason> {
-    let compatible: Vec<&Room> = rooms
-        .iter()
-        .filter(|room| room_can_host(room.kind, attraction.kind))
-        .collect();
-    if compatible.is_empty() {
-        return Err(UnplacedReason::NoCompatibleRoom);
-    }
-
-    let duration = Duration::minutes(i64::from(attraction.duration_minutes));
-    let mut fits_a_day = false;
-    let mut hosts_ever_available = false;
-
-    for day in days {
-        for start in candidate_starts(day, duration, step) {
-            fits_a_day = true;
-            let end = start + duration;
-
-            if !hosts_available(&attraction.host_ids, availability, start, end) {
-                continue;
-            }
-            hosts_ever_available = true;
-
-            if !hosts_idle(&attraction.host_ids, busy, start, end) {
-                continue;
-            }
-
-            if let Some(room) = compatible
-                .iter()
-                .find(|room| room_free(room.id, busy, start, end))
-            {
-                return Ok(PlacedSlot {
-                    attraction_id: attraction.id,
-                    room_id: room.id,
-                    starts_at: start,
-                    ends_at: end,
-                });
-            }
-        }
-    }
-
-    if !fits_a_day {
-        Err(UnplacedReason::DoesNotFitAnyDay)
-    } else if !hosts_ever_available {
-        Err(UnplacedReason::HostsNeverAvailable)
-    } else {
-        Err(UnplacedReason::NoFreeSlot)
-    }
-}
-
-/// Every start leaving room for the full duration before closing.
-fn candidate_starts(day: &Day, duration: Duration, step: Duration) -> Vec<PrimitiveDateTime> {
-    let opens = PrimitiveDateTime::new(day.date, day.opens_at);
-    let closes = PrimitiveDateTime::new(day.date, day.closes_at);
-
-    let mut starts = Vec::new();
-    let mut start = opens;
-    while start + duration <= closes {
-        starts.push(start);
-        start += step;
-    }
-    starts
-}
-
-/// Contests rank first: fewer room kinds can host them.
-fn kind_rank(kind: AttractionKind) -> u8 {
-    match kind {
-        AttractionKind::Contest => 0,
-        AttractionKind::Panel => 1,
-    }
-}
-
-fn room_can_host(room: RoomKind, attraction: AttractionKind) -> bool {
-    matches!(
-        (room, attraction),
-        (RoomKind::PanelContest, _)
-            | (RoomKind::Panel, AttractionKind::Panel)
-            | (RoomKind::Contest, AttractionKind::Contest)
+pub fn router() -> Router<AppState> {
+    Router::new().route(
+        "/conventions/{convention_id}/schedule/generate",
+        get(generate_plan),
     )
 }
 
-/// One window must cover the whole span — v1 doesn't stitch adjacent windows together.
-fn hosts_available(
-    host_ids: &[Uuid],
-    availability: &HashMap<Uuid, Vec<Window>>,
-    start: PrimitiveDateTime,
-    end: PrimitiveDateTime,
-) -> bool {
-    host_ids
-        .iter()
-        .all(|host_id| match availability.get(host_id) {
-            Some(windows) if !windows.is_empty() => windows
-                .iter()
-                .any(|window| window.starts_at <= start && window.ends_at >= end),
-            _ => true,
+/// `GET /conventions/{convention_id}/schedule/generate` — the proposed plan, or 404.
+async fn generate_plan(
+    State(state): State<AppState>,
+    Path(convention_id): Path<Uuid>,
+) -> Result<Json<Plan>, AppError> {
+    let exists = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM conventions WHERE id = $1)",
+        convention_id,
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    if exists != Some(true) {
+        return Err(AppError::NotFound);
+    }
+
+    let day_rows = sqlx::query!(
+        r#"
+        SELECT day, opens_at AS "opens_at!", closes_at AS "closes_at!"
+        FROM convention_days
+        WHERE convention_id = $1 AND opens_at IS NOT NULL AND closes_at IS NOT NULL
+        ORDER BY day
+        "#,
+        convention_id,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let days = day_rows
+        .into_iter()
+        .map(|row| Day {
+            date: row.day,
+            opens_at: row.opens_at,
+            closes_at: row.closes_at,
         })
-}
+        .collect();
 
-fn hosts_idle(
-    host_ids: &[Uuid],
-    busy: &[Busy],
-    start: PrimitiveDateTime,
-    end: PrimitiveDateTime,
-) -> bool {
-    !busy.iter().any(|occupied| {
-        overlaps(occupied, start, end)
-            && occupied
-                .host_ids
-                .iter()
-                .any(|host_id| host_ids.contains(host_id))
-    })
-}
+    let room_rows = sqlx::query!(
+        r#"SELECT id, kind AS "kind: RoomKind" FROM rooms WHERE convention_id = $1 ORDER BY name"#,
+        convention_id,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let rooms = room_rows
+        .into_iter()
+        .map(|row| Room {
+            id: row.id,
+            kind: row.kind,
+        })
+        .collect();
 
-fn room_free(
-    room_id: Uuid,
-    busy: &[Busy],
-    start: PrimitiveDateTime,
-    end: PrimitiveDateTime,
-) -> bool {
-    !busy
-        .iter()
-        .any(|occupied| occupied.room_id == room_id && overlaps(occupied, start, end))
-}
+    let host_rows = sqlx::query!(
+        r#"
+        SELECT ap.attraction_id, ap.panelist_id
+        FROM attraction_panelists ap
+        JOIN attractions a ON a.id = ap.attraction_id
+        WHERE a.convention_id = $1
+        "#,
+        convention_id,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let mut hosts_by_attraction: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+    for row in host_rows {
+        hosts_by_attraction
+            .entry(row.attraction_id)
+            .or_default()
+            .push(row.panelist_id);
+    }
 
-/// Half-open `[start, end)`, so a slot may begin exactly when another ends.
-fn overlaps(occupied: &Busy, start: PrimitiveDateTime, end: PrimitiveDateTime) -> bool {
-    occupied.starts_at < end && start < occupied.ends_at
+    let attraction_rows = sqlx::query!(
+        r#"
+        SELECT a.id, a.kind AS "kind: AttractionKind", a.duration_minutes
+        FROM attractions a
+        WHERE a.convention_id = $1
+          AND NOT EXISTS (SELECT 1 FROM slots s WHERE s.attraction_id = a.id)
+        ORDER BY a.title
+        "#,
+        convention_id,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let to_place = attraction_rows
+        .into_iter()
+        .map(|row| ToPlace {
+            id: row.id,
+            kind: row.kind,
+            duration_minutes: row.duration_minutes,
+            host_ids: hosts_by_attraction
+                .get(&row.id)
+                .cloned()
+                .unwrap_or_default(),
+        })
+        .collect();
+
+    let window_rows = sqlx::query!(
+        r#"
+        SELECT pa.panelist_id, pa.starts_at, pa.ends_at
+        FROM panelist_availability pa
+        JOIN panelists p ON p.id = pa.panelist_id
+        WHERE p.convention_id = $1
+        ORDER BY pa.starts_at
+        "#,
+        convention_id,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let mut availability: HashMap<Uuid, Vec<Window>> = HashMap::new();
+    for row in window_rows {
+        availability
+            .entry(row.panelist_id)
+            .or_default()
+            .push(Window {
+                starts_at: row.starts_at,
+                ends_at: row.ends_at,
+            });
+    }
+
+    let slot_rows = sqlx::query!(
+        r#"
+        SELECT s.room_id, s.attraction_id, s.starts_at, s.ends_at
+        FROM slots s
+        JOIN attractions a ON a.id = s.attraction_id
+        WHERE a.convention_id = $1
+        "#,
+        convention_id,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let busy = slot_rows
+        .into_iter()
+        .map(|row| Busy {
+            room_id: row.room_id,
+            host_ids: hosts_by_attraction
+                .get(&row.attraction_id)
+                .cloned()
+                .unwrap_or_default(),
+            starts_at: row.starts_at,
+            ends_at: row.ends_at,
+        })
+        .collect();
+
+    Ok(Json(generate(GenerateInput {
+        days,
+        rooms,
+        to_place,
+        availability,
+        busy,
+        step_minutes: STEP_MINUTES,
+    })))
 }

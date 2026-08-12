@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT pa.panelist_id, pa.starts_at, pa.ends_at\n        FROM panelist_availability pa\n        JOIN panelists p ON p.id = pa.panelist_id\n        WHERE p.convention_id = $1\n        ORDER BY pa.starts_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "panelist_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "starts_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 2,
+        "name": "ends_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c0830791eabc80b10ba37a3184e9b8f9aa54abf02330ff087cff8e20f437f705"
+}

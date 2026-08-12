@@ -1,383 +1,208 @@
-//! Tests for the schedule generator. It's a pure function, so unlike the rest of
-//! the suite these need no database.
+//! Integration tests for `GET /conventions/{id}/schedule/generate` — the loading
+//! and the dry-run guarantee. The packing itself is covered in `engine.rs`.
 
-use std::collections::HashMap;
+use axum_test::TestServer;
+use serde_json::{Value, json};
+use sqlx::PgPool;
 
-use convention_scheduler::generator::{
-    AttractionKind, Busy, Day, GenerateInput, Plan, Room, RoomKind, ToPlace, UnplacedReason,
-    Window, generate,
+mod common;
+use common::{
+    create_attraction, create_convention, create_panelist, create_room, create_slot, link_host,
+    server,
 };
-use time::macros::{date, datetime, time};
-use uuid::Uuid;
 
-/// One day, 10:00–14:00.
-fn one_day() -> Vec<Day> {
-    vec![Day {
-        date: date!(2026 - 08 - 14),
-        opens_at: time!(10:00),
-        closes_at: time!(14:00),
-    }]
+async fn set_hours(server: &TestServer, con: &str, day: &str, opens: &str, closes: &str) {
+    server
+        .patch(&format!("/conventions/{con}/days/{day}"))
+        .json(&json!({ "opens_at": opens, "closes_at": closes }))
+        .await
+        .assert_status_ok();
 }
 
-fn room(kind: RoomKind) -> Room {
-    Room {
-        id: Uuid::new_v4(),
-        kind,
-    }
+async fn generate(server: &TestServer, con: &str) -> Value {
+    let res = server
+        .get(&format!("/conventions/{con}/schedule/generate"))
+        .await;
+    res.assert_status_ok();
+    res.json::<Value>()
 }
 
-fn attraction(kind: AttractionKind, minutes: i32, hosts: &[Uuid]) -> ToPlace {
-    ToPlace {
-        id: Uuid::new_v4(),
-        kind,
-        duration_minutes: minutes,
-        host_ids: hosts.to_vec(),
-    }
+async fn slot_count(server: &TestServer, con: &str) -> usize {
+    let res = server.get(&format!("/conventions/{con}/slots")).await;
+    res.assert_status_ok();
+    res.json::<Value>().as_array().unwrap().len()
 }
 
-fn input(days: Vec<Day>, rooms: Vec<Room>, to_place: Vec<ToPlace>) -> GenerateInput {
-    GenerateInput {
-        days,
-        rooms,
-        to_place,
-        availability: HashMap::new(),
-        busy: Vec::new(),
-        step_minutes: 60,
-    }
+#[sqlx::test]
+async fn an_unplaced_attraction_is_proposed_a_slot(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    set_hours(&server, &con, "2026-08-01", "10:00", "14:00").await;
+    let hall = create_room(&server, &con, "Hall", "panel").await;
+    let attraction = create_attraction(&server, &con, "Panel", "panel", 60).await;
+
+    let plan = generate(&server, &con).await;
+
+    assert_eq!(plan["unplaced"].as_array().unwrap().len(), 0);
+    let placed = plan["placed"].as_array().unwrap();
+    assert_eq!(placed.len(), 1);
+    assert_eq!(placed[0]["attraction_id"], attraction);
+    assert_eq!(placed[0]["room_id"], hall);
+    assert_eq!(placed[0]["starts_at"], "2026-08-01T10:00:00");
+    assert_eq!(placed[0]["ends_at"], "2026-08-01T11:00:00");
 }
 
-fn only_reason(plan: &Plan) -> &UnplacedReason {
-    assert_eq!(plan.unplaced.len(), 1, "expected exactly one unplaced");
-    &plan.unplaced[0].reason
+#[sqlx::test]
+async fn generating_writes_nothing(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    set_hours(&server, &con, "2026-08-01", "10:00", "14:00").await;
+    create_room(&server, &con, "Hall", "panel").await;
+    create_attraction(&server, &con, "Panel", "panel", 60).await;
+
+    let plan = generate(&server, &con).await;
+
+    assert_eq!(plan["placed"].as_array().unwrap().len(), 1);
+    assert_eq!(slot_count(&server, &con).await, 0);
 }
 
-#[test]
-fn an_attraction_lands_at_the_first_hour_of_the_day() {
-    let hall = room(RoomKind::Panel);
-    let hall_id = hall.id;
+#[sqlx::test]
+async fn an_already_placed_attraction_is_left_out(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    set_hours(&server, &con, "2026-08-01", "10:00", "14:00").await;
+    let hall = create_room(&server, &con, "Hall", "panel").await;
+    let placed_already = create_attraction(&server, &con, "Placed", "panel", 60).await;
+    let waiting = create_attraction(&server, &con, "Waiting", "panel", 60).await;
+    create_slot(
+        &server,
+        &con,
+        &placed_already,
+        &hall,
+        "2026-08-01T10:00:00",
+        "2026-08-01T11:00:00",
+    )
+    .await;
 
-    let plan = generate(input(
-        one_day(),
-        vec![hall],
-        vec![attraction(AttractionKind::Panel, 60, &[])],
-    ));
+    let plan = generate(&server, &con).await;
 
-    assert!(plan.unplaced.is_empty());
-    assert_eq!(plan.placed.len(), 1);
-    assert_eq!(plan.placed[0].room_id, hall_id);
-    assert_eq!(plan.placed[0].starts_at, datetime!(2026-08-14 10:00));
-    assert_eq!(plan.placed[0].ends_at, datetime!(2026-08-14 11:00));
+    let placed = plan["placed"].as_array().unwrap();
+    assert_eq!(placed.len(), 1);
+    assert_eq!(placed[0]["attraction_id"], waiting);
+    assert_eq!(plan["unplaced"].as_array().unwrap().len(), 0);
 }
 
-#[test]
-fn a_contest_skips_a_panel_only_room() {
-    let contest_room = room(RoomKind::Contest);
-    let contest_room_id = contest_room.id;
+#[sqlx::test]
+async fn an_existing_slot_blocks_its_room(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    set_hours(&server, &con, "2026-08-01", "10:00", "14:00").await;
+    let hall = create_room(&server, &con, "Hall", "panel").await;
+    let occupant = create_attraction(&server, &con, "Occupant", "panel", 60).await;
+    create_attraction(&server, &con, "Waiting", "panel", 60).await;
+    create_slot(
+        &server,
+        &con,
+        &occupant,
+        &hall,
+        "2026-08-01T10:00:00",
+        "2026-08-01T11:00:00",
+    )
+    .await;
 
-    let plan = generate(input(
-        one_day(),
-        vec![room(RoomKind::Panel), contest_room],
-        vec![attraction(AttractionKind::Contest, 60, &[])],
-    ));
+    let plan = generate(&server, &con).await;
 
-    assert_eq!(plan.placed[0].room_id, contest_room_id);
+    assert_eq!(plan["placed"][0]["starts_at"], "2026-08-01T11:00:00");
 }
 
-#[test]
-fn a_panel_contest_room_hosts_either_kind() {
-    let plan = generate(input(
-        one_day(),
-        vec![room(RoomKind::PanelContest)],
-        vec![
-            attraction(AttractionKind::Contest, 60, &[]),
-            attraction(AttractionKind::Panel, 60, &[]),
-        ],
-    ));
+#[sqlx::test]
+async fn an_existing_slot_blocks_its_host_elsewhere(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    set_hours(&server, &con, "2026-08-01", "10:00", "14:00").await;
+    let hall = create_room(&server, &con, "Hall 1", "panel").await;
+    create_room(&server, &con, "Hall 2", "panel").await;
+    let host = create_panelist(&server, &con, "Ala").await;
+    let occupant = create_attraction(&server, &con, "Occupant", "panel", 60).await;
+    let waiting = create_attraction(&server, &con, "Waiting", "panel", 60).await;
+    link_host(&server, &occupant, &host).await;
+    link_host(&server, &waiting, &host).await;
+    create_slot(
+        &server,
+        &con,
+        &occupant,
+        &hall,
+        "2026-08-01T10:00:00",
+        "2026-08-01T11:00:00",
+    )
+    .await;
 
-    assert_eq!(plan.placed.len(), 2);
-    assert!(plan.unplaced.is_empty());
+    let plan = generate(&server, &con).await;
+
+    assert_eq!(plan["placed"][0]["starts_at"], "2026-08-01T11:00:00");
 }
 
-#[test]
-fn with_no_room_of_the_right_kind_nothing_is_placed() {
-    let plan = generate(input(
-        one_day(),
-        vec![room(RoomKind::Panel)],
-        vec![attraction(AttractionKind::Contest, 60, &[])],
-    ));
+#[sqlx::test]
+async fn a_hosts_window_moves_the_placement(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    set_hours(&server, &con, "2026-08-01", "10:00", "14:00").await;
+    create_room(&server, &con, "Hall", "panel").await;
+    let host = create_panelist(&server, &con, "Ala").await;
+    let attraction = create_attraction(&server, &con, "Panel", "panel", 60).await;
+    link_host(&server, &attraction, &host).await;
+    server
+        .post(&format!("/panelists/{host}/availability"))
+        .json(&json!({
+            "starts_at": "2026-08-01T12:00:00",
+            "ends_at": "2026-08-01T14:00:00",
+        }))
+        .await
+        .assert_status(axum::http::StatusCode::CREATED);
 
-    assert!(plan.placed.is_empty());
-    assert_eq!(only_reason(&plan), &UnplacedReason::NoCompatibleRoom);
+    let plan = generate(&server, &con).await;
+
+    assert_eq!(plan["placed"][0]["starts_at"], "2026-08-01T12:00:00");
 }
 
-#[test]
-fn an_attraction_longer_than_the_day_is_unplaceable() {
-    let plan = generate(input(
-        one_day(),
-        vec![room(RoomKind::Panel)],
-        vec![attraction(AttractionKind::Panel, 300, &[])],
-    ));
+#[sqlx::test]
+async fn a_day_without_hours_is_not_scheduled_into(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    create_room(&server, &con, "Hall", "panel").await;
+    let attraction = create_attraction(&server, &con, "Panel", "panel", 60).await;
 
-    assert_eq!(only_reason(&plan), &UnplacedReason::DoesNotFitAnyDay);
+    let plan = generate(&server, &con).await;
+
+    assert_eq!(plan["placed"].as_array().unwrap().len(), 0);
+    let unplaced = plan["unplaced"].as_array().unwrap();
+    assert_eq!(unplaced.len(), 1);
+    assert_eq!(unplaced[0]["attraction_id"], attraction);
+    assert_eq!(unplaced[0]["reason"], "does_not_fit_any_day");
 }
 
-#[test]
-fn contests_are_placed_before_panels() {
-    let contest = attraction(AttractionKind::Contest, 60, &[]);
-    let contest_id = contest.id;
+#[sqlx::test]
+async fn an_attraction_with_no_room_for_its_kind_says_so(pool: PgPool) {
+    let server = server(pool);
+    let con = create_convention(&server).await;
+    set_hours(&server, &con, "2026-08-01", "10:00", "14:00").await;
+    create_room(&server, &con, "Hall", "panel").await;
+    create_attraction(&server, &con, "Contest", "contest", 60).await;
 
-    // Listed panel-first, so only the sort can win the 10:00 slot for the contest.
-    let plan = generate(input(
-        one_day(),
-        vec![room(RoomKind::PanelContest)],
-        vec![attraction(AttractionKind::Panel, 60, &[]), contest],
-    ));
+    let plan = generate(&server, &con).await;
 
-    assert_eq!(plan.placed[0].attraction_id, contest_id);
-    assert_eq!(plan.placed[0].starts_at, datetime!(2026-08-14 10:00));
-}
-
-#[test]
-fn the_attraction_with_more_hosts_is_placed_first() {
-    let crowded = attraction(
-        AttractionKind::Panel,
-        60,
-        &[Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()],
+    assert_eq!(
+        plan["unplaced"][0]["reason"].as_str().unwrap(),
+        "no_compatible_room"
     );
-    let crowded_id = crowded.id;
-
-    let plan = generate(input(
-        one_day(),
-        vec![room(RoomKind::Panel)],
-        vec![
-            attraction(AttractionKind::Panel, 60, &[Uuid::new_v4()]),
-            crowded,
-        ],
-    ));
-
-    assert_eq!(plan.placed[0].attraction_id, crowded_id);
 }
 
-#[test]
-fn two_attractions_sharing_a_host_run_back_to_back() {
-    let host = Uuid::new_v4();
-
-    let plan = generate(input(
-        one_day(),
-        vec![room(RoomKind::PanelContest)],
-        vec![
-            attraction(AttractionKind::Panel, 60, &[host]),
-            attraction(AttractionKind::Panel, 60, &[host]),
-        ],
-    ));
-
-    assert_eq!(plan.placed.len(), 2);
-    assert_eq!(plan.placed[0].starts_at, datetime!(2026-08-14 10:00));
-    assert_eq!(plan.placed[1].starts_at, datetime!(2026-08-14 11:00));
-}
-
-#[test]
-fn attractions_without_a_shared_host_run_in_parallel_rooms() {
-    let plan = generate(input(
-        one_day(),
-        vec![room(RoomKind::Panel), room(RoomKind::Panel)],
-        vec![
-            attraction(AttractionKind::Panel, 60, &[Uuid::new_v4()]),
-            attraction(AttractionKind::Panel, 60, &[Uuid::new_v4()]),
-        ],
-    ));
-
-    assert_eq!(plan.placed.len(), 2);
-    assert_eq!(plan.placed[0].starts_at, plan.placed[1].starts_at);
-    assert_ne!(plan.placed[0].room_id, plan.placed[1].room_id);
-}
-
-#[test]
-fn a_host_who_stated_no_windows_is_free_whenever() {
-    let plan = generate(input(
-        one_day(),
-        vec![room(RoomKind::Panel)],
-        vec![attraction(AttractionKind::Panel, 60, &[Uuid::new_v4()])],
-    ));
-
-    assert_eq!(plan.placed[0].starts_at, datetime!(2026-08-14 10:00));
-}
-
-#[test]
-fn a_hosts_window_pushes_the_slot_later() {
-    let host = Uuid::new_v4();
-    let mut request = input(
-        one_day(),
-        vec![room(RoomKind::Panel)],
-        vec![attraction(AttractionKind::Panel, 60, &[host])],
-    );
-    request.availability.insert(
-        host,
-        vec![Window {
-            starts_at: datetime!(2026-08-14 12:00),
-            ends_at: datetime!(2026-08-14 14:00),
-        }],
-    );
-
-    let plan = generate(request);
-
-    assert_eq!(plan.placed[0].starts_at, datetime!(2026-08-14 12:00));
-}
-
-#[test]
-fn a_window_that_never_meets_the_program_leaves_the_host_unplaceable() {
-    let host = Uuid::new_v4();
-    let mut request = input(
-        one_day(),
-        vec![room(RoomKind::Panel)],
-        vec![attraction(AttractionKind::Panel, 60, &[host])],
-    );
-    request.availability.insert(
-        host,
-        vec![Window {
-            starts_at: datetime!(2026-08-20 10:00),
-            ends_at: datetime!(2026-08-20 14:00),
-        }],
-    );
-
-    let plan = generate(request);
-
-    assert_eq!(only_reason(&plan), &UnplacedReason::HostsNeverAvailable);
-}
-
-#[test]
-fn a_window_shorter_than_the_attraction_never_covers_it() {
-    let host = Uuid::new_v4();
-    let mut request = input(
-        one_day(),
-        vec![room(RoomKind::Panel)],
-        vec![attraction(AttractionKind::Panel, 120, &[host])],
-    );
-    request.availability.insert(
-        host,
-        vec![Window {
-            starts_at: datetime!(2026-08-14 10:00),
-            ends_at: datetime!(2026-08-14 11:00),
-        }],
-    );
-
-    let plan = generate(request);
-
-    assert_eq!(only_reason(&plan), &UnplacedReason::HostsNeverAvailable);
-}
-
-#[test]
-fn every_host_must_be_available_not_just_one() {
-    let free_host = Uuid::new_v4();
-    let busy_host = Uuid::new_v4();
-    let mut request = input(
-        one_day(),
-        vec![room(RoomKind::Panel)],
-        vec![attraction(
-            AttractionKind::Panel,
-            60,
-            &[free_host, busy_host],
-        )],
-    );
-    request.availability.insert(
-        busy_host,
-        vec![Window {
-            starts_at: datetime!(2026-08-14 13:00),
-            ends_at: datetime!(2026-08-14 14:00),
-        }],
-    );
-
-    let plan = generate(request);
-
-    assert_eq!(plan.placed[0].starts_at, datetime!(2026-08-14 13:00));
-}
-
-#[test]
-fn an_existing_slot_blocks_its_room() {
-    let hall = room(RoomKind::Panel);
-    let hall_id = hall.id;
-    let mut request = input(
-        one_day(),
-        vec![hall],
-        vec![attraction(AttractionKind::Panel, 60, &[])],
-    );
-    request.busy.push(Busy {
-        room_id: hall_id,
-        host_ids: Vec::new(),
-        starts_at: datetime!(2026-08-14 10:00),
-        ends_at: datetime!(2026-08-14 11:00),
-    });
-
-    let plan = generate(request);
-
-    assert_eq!(plan.placed[0].starts_at, datetime!(2026-08-14 11:00));
-}
-
-#[test]
-fn an_existing_slot_blocks_its_host_in_every_room() {
-    let host = Uuid::new_v4();
-    let mut request = input(
-        one_day(),
-        vec![room(RoomKind::Panel), room(RoomKind::Panel)],
-        vec![attraction(AttractionKind::Panel, 60, &[host])],
-    );
-    request.busy.push(Busy {
-        room_id: Uuid::new_v4(),
-        host_ids: vec![host],
-        starts_at: datetime!(2026-08-14 10:00),
-        ends_at: datetime!(2026-08-14 11:00),
-    });
-
-    let plan = generate(request);
-
-    assert_eq!(plan.placed[0].starts_at, datetime!(2026-08-14 11:00));
-}
-
-#[test]
-fn a_full_program_reports_what_didnt_fit() {
-    let days = vec![Day {
-        date: date!(2026 - 08 - 14),
-        opens_at: time!(10:00),
-        closes_at: time!(11:00),
-    }];
-
-    let plan = generate(input(
-        days,
-        vec![room(RoomKind::Panel)],
-        vec![
-            attraction(AttractionKind::Panel, 60, &[]),
-            attraction(AttractionKind::Panel, 60, &[]),
-        ],
-    ));
-
-    assert_eq!(plan.placed.len(), 1);
-    assert_eq!(only_reason(&plan), &UnplacedReason::NoFreeSlot);
-}
-
-#[test]
-fn placement_spills_onto_the_next_day() {
-    let days = vec![
-        Day {
-            date: date!(2026 - 08 - 14),
-            opens_at: time!(10:00),
-            closes_at: time!(11:00),
-        },
-        Day {
-            date: date!(2026 - 08 - 15),
-            opens_at: time!(10:00),
-            closes_at: time!(14:00),
-        },
-    ];
-
-    let plan = generate(input(
-        days,
-        vec![room(RoomKind::Panel)],
-        vec![
-            attraction(AttractionKind::Panel, 60, &[]),
-            attraction(AttractionKind::Panel, 60, &[]),
-        ],
-    ));
-
-    assert_eq!(plan.placed.len(), 2);
-    assert_eq!(plan.placed[1].starts_at, datetime!(2026-08-15 10:00));
+#[sqlx::test]
+async fn generating_for_a_missing_convention_is_404(pool: PgPool) {
+    let server = server(pool);
+    let ghost = "00000000-0000-0000-0000-000000000000";
+    server
+        .get(&format!("/conventions/{ghost}/schedule/generate"))
+        .await
+        .assert_status_not_found();
 }
