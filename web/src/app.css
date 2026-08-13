@@ -1,0 +1,19 @@
+:root {
+  --bg: #16161a;
+  --surface: #1e1e24;
+  --text: #e8e8ea;
+  --muted: #9a9aa4;
+  --line: #33333c;
+  --danger: #e5707a;
+
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}

@@ -23,7 +23,7 @@ hardening pass (integration tests, Dockerfile, CI), and the schedule generator
 (per-day program hours, panelist availability windows,
 `GET /conventions/:id/schedule/generate` to propose a plan, and
 `POST /conventions/:id/slots/bulk` to save a reviewed one). The operator GUI
-(Phase 6) is next. See the [Roadmap](#roadmap) below.
+(Phase 6) is underway. See the [Roadmap](#roadmap) below.
 
 ## Tech stack
 
@@ -32,10 +32,11 @@ hardening pass (integration tests, Dockerfile, CI), and the schedule generator
 - **tokio** async runtime, **serde** for JSON, **tracing** for structured logs
 - **Docker Compose** for the local database, multi-stage **Dockerfile** for the app
 - Integration tests + GitHub Actions CI
+- **Svelte** 5 + **TypeScript** on **Vite** for the operator GUI in [web/](web/)
 
 ## Getting started
 
-You need Rust (1.96+) and Docker.
+You need Rust (1.96+) and Docker; the GUI also needs Node 22+.
 
 ```sh
 # 1. Start Postgres
@@ -51,6 +52,20 @@ cargo run
 curl localhost:8080/health
 # -> {"db":"up","status":"ok"}
 ```
+
+### Operator GUI
+
+The frontend lives in [web/](web/) and runs alongside the server:
+
+```sh
+cd web
+npm install
+npm run dev
+# -> http://localhost:5173
+```
+
+Its dev server proxies `/api/*` to the API on port 8080, so both sides share one
+origin and the server needs no CORS handling.
 
 ### Development
 
